@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Automatically check and download jw.org: wp w g ws mwb
 # Needed programs: bash wget // Optional: gzip pgrep (these are normally preinstalled in most Linux distros)
@@ -11,12 +11,12 @@
 # Online checker
 maj-online () {
   ipaddr='8.8.8.8'
-  [[ -z $(ping -c1 $ipaddr |& grep -o 'Network is unreachable') ]] || exit 1
-  [[ -z $(ping -c3 $ipaddr |& grep -o '100% packet loss') ]] && exit 0 || exit 2
+  [[ -z $(ping -c1 ${ipaddr} |& grep -o 'Network is unreachable') ]] || exit 1
+  [[ -z $(ping -c3 ${ipaddr} |& grep -o '100% packet loss') ]] && exit 0 || exit 2
 }
 
 # User options
-DIRBASE='$HOME/Desktop/JWGet'
+DIRBASE="$HOME/Desktop/JWGet"
 format='PDF' #EPUB,MOBI,PDF,RTF,BRL Choose one at a time
 LANG='E'
 
@@ -29,11 +29,11 @@ LOGFILE="/dev/null" # Can be set to "${DIRBASE}/jwget.log"
 opts="-bcN -a ${LOGFILE} --progress=dot:giga --content-disposition"
 
 # Date generate
-yearmonth0=`date -u +%Y%m`
-yearmonth1=`date -u +%Y%m --date='next month'`
-yearmonth2=`date -u +%Y%m --date='2 months'`
-yearmonth3=`date -u +%Y%m --date='3 months'`
-yearmonth4=`date -u +%Y%m --date='4 months'`
+yearmonth0=$(date -u +%Y%m)
+yearmonth1=$(date -u +%Y%m --date='next month')
+yearmonth2=$(date -u +%Y%m --date='2 months')
+yearmonth3=$(date -u +%Y%m --date='3 months')
+yearmonth4=$(date -u +%Y%m --date='4 months')
 
 # Check directories
 [ -d "${DIRBASE}" ] || mkdir -p "${DIRBASE}"
