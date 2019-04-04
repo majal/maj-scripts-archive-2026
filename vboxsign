@@ -1,5 +1,6 @@
 #!/bin/bash
 # Sign and load VirtualBox modules
+# https://www.majlovesreg.one/thoughts/sign-virtualbox-on-ubuntu-16-04-with-secure-boot-enabled/
 
 # Run as root
 [ "`whoami`" = root ] || exec sudo "$0" "$@"
