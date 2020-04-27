@@ -1,9 +1,12 @@
 #!/bin/bash
 # Sign and load VirtualBox modules
+
+# https://www.majlovesreg.one/tag/code/
 # https://www.majlovesreg.one/thoughts/sign-virtualbox-on-ubuntu-16-04-with-secure-boot-enabled/
+# https://github.com/majal/maj-scripts/blob/master/vboxsign
 
 # Run as root
-[ "`whoami`" = root ] || exec sudo "$0" "$@"
+[ $EUID -ne 0 ] && { echo; exec sudo "$0" "$@"; }
 
 # Set working directory
 dir=/home/directory/of/keys
