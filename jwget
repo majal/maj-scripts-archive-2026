@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Automatically check and download jw.org: wp w g ws mwb
+# Automatically check and download jw.org: wp w g mwb
 # Needed programs: bash wget // Optional: gzip pgrep (these are normally preinstalled in most Linux distros)
-# v2.3 - Updated download link and options of 'g' as large print came out
-# v3.0 - 2018 version consolidating changes in jw.org and improving code writing
+# v2.3.0 - Updated download link and options of 'g' as large print came out
+# v3.0.0 - 2018 version consolidating changes in jw.org and improving code writing
+# v3.0.1 - Removed 'ws', simplified version of The Watchtower magazine no longer supported
 
 # Check for multiple instances
 [ $(pgrep -c "$(basename $0)") -gt 1 ] && { echo; echo -e "\e[1m\e[93m$(basename $0): \e[0mMutiple script instances found! \e[91mExiting..."; echo; exit 1; }
@@ -26,7 +27,7 @@ option='GETPUBMEDIALINKS'
 
 # wget options
 LOGFILE="/dev/null" # Can be set to "${DIRBASE}/jwget.log"
-opts="-bcN -a ${LOGFILE} --progress=dot:giga --content-disposition"
+opts="-bcN -a "${LOGFILE}" --progress=dot:giga --content-disposition"
 
 # Date generate
 yearmonth0=$(date -u +%Y%m)
@@ -40,7 +41,6 @@ yearmonth4=$(date -u +%Y%m --date='4 months')
 [ -d "${DIRBASE}/wp" ] || mkdir -p "${DIRBASE}/wp"
 [ -d "${DIRBASE}/w" ] || mkdir -p "${DIRBASE}/w"
 [ -d "${DIRBASE}/g" ] || mkdir -p "${DIRBASE}/g"
-[ -d "${DIRBASE}/ws" ] || mkdir -p "${DIRBASE}/ws"
 [ -d "${DIRBASE}/mwb" ] || mkdir -p "${DIRBASE}/mwb"
 
 # Initialize directory and (optionally) logfile
@@ -55,7 +55,7 @@ while ! maj-online; do sleep 15m; done
 echo "\n`date`\n" >> "${LOGFILE}"
 echo "\n******************************START OF SCRIPT RUN*******************************" >> "${LOGFILE}"
 
-for magtype in 'wp' 'w' 'g' 'ws' 'mwb'; do 
+for magtype in 'wp' 'w' 'g' 'mwb'; do 
   cd "${DIRBASE}/${magtype}"
   echo "\n\n" >> "${LOGFILE}"
 
@@ -69,7 +69,7 @@ for magtype in 'wp' 'w' 'g' 'ws' 'mwb'; do
   done
 done
 
-echo "\n                           ::::: End of script run :::::\n`date`\n" >> ${LOGFILE}
+echo "\n                           ::::: End of script run :::::\n`date`\n" >> "${LOGFILE}"
 
 # Compress logfile
 # cd "${DIRBASE}"
