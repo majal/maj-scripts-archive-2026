@@ -1,0 +1,132 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+# 2021.04.05
+
+source $HOME/.bashrc
+source $HOME/.profile
+
+[ "$(certikcli status | jq '.sync_info.catching_up')" = "false" ] || errx "certikd not running or still catching up..." 1
+
+#############################################################################################
+
+walletname=''
+walletaddr='{certik1...}'
+
+valaddr='{certikvaloper1...}'
+
+memo="$(date)"
+
+fee=''
+
+blktime=$(( 6 * 3 )) # in seconds
+
+# extnode='tcp://xxx.xxx.xxx.xxx:26657'
+locnode='tcp://localhost:26657'
+extnode=${locnode}
+
+ctk_wallets='/path/to/wallets/list'
+logfile='/tmp/redelegate_logs'
+
+z=1000000 # uCTK to CTK
+
+# Values below in CTK
+w_baseamt=1
+min_withdraw=1
+min_redelegate=1
+min_send=1
+
+#############################################################################################
+
+#########################
+### Validator rewards ###
+#########################
+
+function validator_rewards () {
+  validator_amount=$(certikcli q distribution commission ${valaddr} -o json --node ${locnode})
+  [ "${validator_amount}" != "null" ] && {
+    vr=$(echo "${validator_amount}" | jq -r '.[].amount' | grep -o '^[0-9]\+')
+    (( vr > min_withdraw * z )) && {
+      txhash_validator_rewards=$(certikcli tx distribution withdraw-rewards ${valaddr} --from ${walletname} --memo "${memo}" --commission --fees "${fee}" -y -o json --node ${extnode} | jq -r '.txhash') && sleep $(( blktime * 3 ))
+    }
+  }
+}
+
+validator_rewards
+
+
+######################
+### Wallet rewards ###
+######################
+
+function wallet_rewards () {
+  wallet_amount=$(certikcli q distribution rewards ${walletaddr} -o json --node ${locnode})
+  [ "${wallet_amount}" != "null" ] && {
+    wr=$(echo "${wallet_amount}" | jq -r '.total[].amount' | grep -o '^[0-9]\+')
+    
+    (( wr >= min_withdraw * z )) && {
+      txhash_wallet_rewards=$(certikcli tx distribution withdraw-all-rewards --from ${walletname} --memo "${memo}" --fees "${fee}" -y -o json --node ${extnode} | jq -r '.txhash') && sleep $(( blktime * 3 ))
+    }
+  }
+}
+
+wallet_rewards
+
+
+##################
+### Redelegate ###
+##################
+
+function certik_redelegate () {
+  w_now=$(certikcli q account ${walletaddr} -o json --node ${locnode} | jq -r '.value.coins[].amount')
+
+  redelegate=$(( w_now - w_baseamt * z -1 ))
+
+  (( redelegate > min_redelegate * z )) && {
+    txhash_redelegate=$(certikcli tx staking delegate ${valaddr} ${redelegate}uctk --from ${walletname} --memo "${memo}" --fees "${fee}" -y -o json --node ${extnode} | jq -r '.txhash') && sleep $(( blktime * 3 ))
+  }
+}
+
+certik_redelegate
+
+
+######################
+### Send to wallet ###
+######################
+
+function send_to_wallet () {
+  source ${ctk_wallets}
+  send_wallet=${wallet01}
+  send_memo=${memo01}
+
+  [ "${send_wallet}" ] || errx "No wallet to send found!" 2
+  [ "${send_memo}" ]   || errx "No wallet memo found!" 3
+
+  available=$(certikcli q account ${walletaddr} -o json --node ${locnode} | jq -r '.value.coins[].amount')
+  send_amt=$(( available - 1 - w_baseamt * z ))
+
+  (( send_amt > min_send * z )) && {
+    txhash_send=$(certikcli tx send ${walletaddr} ${send_wallet} ${send_amt}uctk --memo ${send_memo} --fees "${fee}" -y -o json --node ${extnode} | jq -r '.txhash') && sleep $(( blktime * 3 ))
+  }
+}
+
+# send_to_wallet
+
+
+#####################
+### Check results ###
+#####################
+
+function log_tx () {
+  log_tmp=$(mktemp)
+  [ -f ${logfile} ] && xz -dc ${logfile} > ${log_tmp} || echo "$(date) - initialized log" > ${log_tmp}
+
+  [ "${txhash_wallet_rewards}" ]    && sed -i "1i$(date) - withdraw wallet rewards    - ${txhash_wallet_rewards}" ${log_tmp}
+  [ "${txhash_validator_rewards}" ] && sed -i "1i$(date) - withdraw validator rewards - ${txhash_validator_rewards}" ${log_tmp}
+  [ "${txhash_redelegate}" ]        && sed -i "1i$(date) - delegate                   - ${txhash_redelegate}" ${log_tmp}
+  [ "${txhash_send}" ]              && sed -i "1i$(date) - sent ctk                   - ${txhash_send}" ${log_tmp}
+
+  xz -zc ${log_tmp} > ${logfile}
+  rm ${log_tmp}
+}
+
+log_tx
