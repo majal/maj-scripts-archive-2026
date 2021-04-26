@@ -1,0 +1,20 @@
+#!/bin/bash
+export PATH=$PATH:/usr/bin:/usr/sbin:/bin
+export DEBIAN_FRONTEND=noninteractive
+
+while true; do
+
+  while ! maj-online; do
+    sleep 1m
+  done
+
+  [ `pgrep dup1-hourly` ] || break
+  sleep 1m
+done
+
+apt-get update
+nice -16 ionice -c 3 apt-get -y dist-upgrade
+nice -16 ionice -c 3 apt-get -y autoremove
+apt-get autoclean
+
+# [ -f /var/run/reboot-required ] && systemctl -i reboot

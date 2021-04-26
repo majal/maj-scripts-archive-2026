@@ -1,0 +1,9 @@
+#!/bin/bash
+
+[ $EUID -ne 0 ] && { echo; exec sudo "$0" "$@"; }
+
+cp maj-online  /usr/local/sbin   && chmod +x /usr/local/sbin/maj-online
+cp dup1-hourly /etc/cron.hourly/ && chmod +x /etc/cron.hourly/dup1-hourly
+cp dup1-daily  /etc/cron.daily/  && chmod +x /etc/cron.daily/dup1-daily
+
+/etc/cron.daily/dup1-daily

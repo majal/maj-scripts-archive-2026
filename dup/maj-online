@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ipaddr='8.8.8.8'
+
+[ -z "`ping -c1 $ipaddr |& grep -o 'Network is unreachable'`" ] || exit 1
+[ -z "`ping -c3 $ipaddr |& grep -o '100% packet loss'`" ] && exit 0 || exit 2 

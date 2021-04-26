@@ -1,0 +1,9 @@
+#!/bin/bash
+export PATH=$PATH:/usr/bin:/usr/sbin:/bin
+export DEBIAN_FRONTEND=noninteractive
+
+maj-online || sleep 10m
+maj-online || exit 17
+apt-get update
+nice -16 ionice -c 3 apt-get -y upgrade
+apt-get -d dist-upgrade
