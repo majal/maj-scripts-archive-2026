@@ -1,0 +1,155 @@
+#!/bin/bash
+
+# Multicore minterpolate in ffmpeg
+# Just slice & process & concat
+# NB: The concat points between slices may be weird
+
+# Default arguments
+ff=/usr/bin/ffmpeg
+fps=60
+dur=00:00:10
+enc=libx264
+task=$(( $(nproc --all) - 2 ))
+
+# Reference: https://ffmpeg.org/ffmpeg-filters.html#minterpolate
+m_args=":mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
+
+ff_args=( -hide_banner -loglevel level+warning -nostats -y )
+ff_args_enc=( -crf 20 -preset slow )
+
+################################################################################
+
+# Usage notes
+err_args () {
+	printf "\nUsage: %s -i INPUT_FILE [ARGUMENTS] OUTPUT_FILENAME\n" "$(basename "${0}")"
+	printf "\n"
+	printf "Arguments:\t\t\t\t\t[default values]\n"
+	echo
+  printf "\t-b str\tffmpeg binary path\t\t[%s]\n" "${ff}"
+  printf "\t-d hms\tSlices duration [hour:min:sec]\t[%s]\n" "${dur}"
+	printf "\t-e str\tEncoder name\t\t\t[%s]\n" "${enc}"
+  printf "\t-f str\tffmpeg encoding arguments\t[%s]\n" "'${ff_args_enc[*]}'"
+  printf "\t-p int\tProcess/thread count. 0 is max\t[%s]\n" "${task}"
+	printf "\t-r int\tTarget FPS\t\t\t[%s]\n" "${fps}"
+  printf "\t-m str\tminterpolate arguments\t\t[%s]\n" "'${m_args}'"
+  printf "\t-s hms\tStart point of source video\t[00:00:00]\n"
+	printf "\t-t hms\tEnd point of source video\t[until end of the video]\n"
+  echo
+	exit 1
+}
+
+# Clean slices and temporary files
+clean () {
+	rm -f _cut.mp4
+	rm -f _s_?????.mp4
+	rm -f _m__s_?????.mp4
+	rm -f _list.txt
+}
+
+while getopts 'i:r:s:t:e:p:d:b:m:f' OPTION; do
+	case $OPTION in
+		i)
+			in=$OPTARG # input file
+			;;
+		r)
+			fps=$OPTARG # target fps, fraction is also OK
+			;;
+		s)
+			ss=$OPTARG # begin time of input
+			;;
+		t)
+			to=$OPTARG # end time of input
+			;;
+		e)
+			enc=$OPTARG # encoder
+			;;
+		p)
+			task=$((OPTARG)) # process count, xargs use max when it is 0
+			;;
+		d)
+			dur=$OPTARG # parallel block length
+			;;
+		b)
+			ff=$OPTARG # ffmpeg binary
+			;;
+    m)
+			m_args=$OPTARG # minterpolate arguments
+			;;
+    f)
+			ff_args_enc=$OPTARG # ffmpeg encoding arguments
+			;;
+		*)
+			err_args
+			;;
+	esac
+done
+shift $((OPTIND - 1))
+
+# Set output file
+out="${1}"
+
+# Select input file
+temp="${in}"
+
+# Check arguments and files
+if [ -z "${in}" ]; then
+  echo
+	echo "$(basename ${0}): missing input file"
+	err_args
+fi
+
+if [ -z "${out}" ]; then
+  echo
+	echo "$(basename ${0}): missing output filename"
+	err_args
+fi
+
+# Set start and end duration for minterpolation
+duration=()
+
+if [ -n "${ss}" ]; then
+	duration+=(-ss)
+	duration+=("${ss}")
+	temp=_cut.mp4
+fi
+
+if [ -n "${to}" ]; then
+	duration+=(-to)
+	duration+=("${to}")
+	temp=_cut.mp4
+fi
+
+################################################################################
+
+clean
+
+echo
+echo "Processing ${in} ..."
+echo
+
+# Use origin file or cut a part from origin file
+if [ "${temp}" == _cut.mp4 ]; then
+	"${ff}" "${ff_args[@]}" "${duration[@]}" -i "${in}" -c copy "${temp}"
+fi
+
+# Make slices for parallel use
+"${ff}" "${ff_args[@]}" -i "${temp}" -c copy -f segment -segment_time "${dur}" '_s_%05d.mp4'
+
+xargs_cmd="/usr/bin/nice -n 19 ${ff} ${ff_args[@]} -i _fname -vf minterpolate=fps=${fps}${m_args} -c:a copy -c:v ${enc} ${ff_args_enc[@]} _m__fname"
+
+# Minterpolate the slices. Get coffee, go out and exercise, or sleep. This will a while.
+find . -name '_s_?????.mp4' | sed 's@^.*/@@g' | xargs -I "_fname" -t -P ${task} -- ${xargs_cmd} && echo "Processed slice: $(ls _m__s_?????.mp4 | wc -l) of $(ls _s_?????.mp4 | wc -l) ..."
+
+# Make a list of minterpolated slices
+printf "file '%s'\n" ./_m__s_?????.mp4 > _list.txt
+
+# Concatenate the result
+"${ff}" "${ff_args[@]}" -f concat -safe 0 -i _list.txt -c copy "${out}"
+
+echo
+echo "Processing of ${in} complete. Created ${out}."
+echo
+echo "################################################################################"
+echo
+
+clean
