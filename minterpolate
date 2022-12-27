@@ -9,7 +9,7 @@ ff=/usr/bin/ffmpeg
 fps=60
 dur=00:00:10
 enc=libx264
-task=$(( $(nproc --all) - 2 ))
+[ "${OSTYPE}" == "darwin"* ] && task=$(( $(sysctl -n hw.logicalcpu) - 2 )) || task=$(( $(nproc --all) - 2 ))
 
 # Reference: https://ffmpeg.org/ffmpeg-filters.html#minterpolate
 m_args=":mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
