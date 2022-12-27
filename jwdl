@@ -1,0 +1,98 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+
+source $HOME/bin/maj-source
+
+pubs=(\
+  "osg" \
+  "sjjm" \
+  "sjjc" \
+  "sjji" \
+  "pksjj" \
+)
+
+pubs_desc=(\
+  "Original Songs" \
+  "Sing Out Joyfully—Meetings" \
+  "Sing Out Joyfully—Vocals" \
+  "Sing Out Joyfully—Instrumentals" \
+  "Sing Out Joyfully—Children" \
+)
+
+dir_save=(\
+  "/home/maj/Music/Watchtower Music/Original Songs" \
+  "/home/maj/Music/Watchtower Music/“Sing out Joyfully”—Meetings" \
+  "/home/maj/Music/Watchtower Music/“Sing out Joyfully”—Vocals" \
+  "/home/maj/Music/Watchtower Music/“Sing out Joyfully”—Instrumentals" \
+  "/home/maj/Music/Watchtower Music/“Sing out Joyfully”—Children" \
+)
+
+[ -z "${1}" ] && errx "usage: $(basename ${0})  <dl type>  [language code]\n\n\
+Types:\n\n\
+$(for a in ${!pubs[@]}; do echo ${pubs[${a}]}  -  ${pubs_desc[${a}]}; done)\n\
+all  -  download all music files\n" 1
+
+[ "${1}" = "all" ] && pub="all" || pub=""
+
+for b in ${!pubs[@]}; do
+  [ "${1}" = "${pubs[${b}]}" ] && {
+    pub="${pubs[${b}]}"
+    dir="${dir_save[${b}]}"
+  }
+done
+
+[ -z "${pub}" ] && errx "usage: $(basename ${0})  <dl type>  [language code]\n\n\
+Types:\n\n\
+$(for a in ${!pubs[@]}; do echo ${pubs[${a}]}  -  ${pubs_desc[${a}]}; done)\n\
+all  -  download all music files\n" 2
+
+for d in ${!dir_save[@]}; do
+  [ -d "${dir_save[${d}]}" ] || {
+    mkdir -p "${dir_save[${d}]}"
+    echo
+    echo "Created directory: ${dir_save[${d}]}"
+    echo
+  }
+done
+
+[ -z "${2}" ] && lang='E' || lang="${2}"
+
+################################################################################
+
+function dl {
+  dl_json="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&pub=${1}&fileformat=MP3%2CAAC&alllangs=0&langwritten=${lang}"
+  tmp_json="/tmp/${1}_$(date '+%F_%T').json"
+
+  curl -so "${tmp_json}" "${dl_json}" || errx "Download from ${dl_json} failed." 10
+
+  readarray -t url   < <(cat "${tmp_json}" | jq -r ".files.${lang}.MP3[].file.url")
+  readarray -t title < <(cat "${tmp_json}" | jq -r ".files.${lang}.MP3[].title")
+
+  [ "${#url[@]}" -ne "${#title[@]}" ] && errx "Titles and URL count do not match." 11
+
+  cd "${2}"
+
+  echo "Processing pub: ${1}, lang: ${lang}, file: ${tmp_json} ..."
+  echo
+
+  for n in ${!url[@]}; do
+    filename="${2}/$(basename ${url[${n}]} | grep -o '^[^\.]\+') ($(echo ${title[${n}]} | sed 's/'\''/’/g' | sed 's/^"/“/g' | sed 's/\. "/. “/g' | sed 's/"$/”/g')).mp3"
+    [ ! -f  "${filename}" ] && echo "${url[${n}]}" | grep -q '\.mp3$' && {
+      printf "Downloading and saving to \"${filename}\" ... "
+      curl -so "${filename}" "${url[${n}]}"
+      echo-g "done"
+    }
+  done
+
+  echo
+}
+
+################################################################################
+
+[ "${pub}" = "all" ] && {
+  for c in ${!pubs[@]}; do
+    dl "${pubs[${c}]}" "${dir_save[${c}]}"
+  done
+} || {
+  dl "${pub}" "${dir}"
+}
