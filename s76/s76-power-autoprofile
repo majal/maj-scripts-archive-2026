@@ -4,10 +4,30 @@
 # source $HOME/bin/maj-source
 
 ################################################################################
-# Check for udev rules - installs the script to UDEV for activation
+# Set files and variables
 ################################################################################
 
+s76power='/usr/bin/system76-power'
+[ -x "${s76power}" ] || {
+  echo "Cannot execute '${s76power}'. Exiting..."
+  exit 1
+}
+
+brightness_screen_kern='/sys/class/backlight/acpi_video0/brightness'
+[ -r "${brightness_screen_kern}" ] && brightness_screen_file="$(basename ${0})-brightness_screen" || brightness_screen_kern=
+
+brightness_kbd_kern='/sys/class/leds/system76_acpi::kbd_backlight/brightness'
+[ -r "${brightness_kbd_kern}" ] && brightness_kbd_file="$(basename ${0})-brightness_kbd" || brightness_kbd_kern=
+
+brightness_kbd_min=25
+
 udev_file="/etc/udev/rules.d/90-$(basename ${0}).rules"
+
+umask 022
+
+################################################################################
+# Check for UDEV rules, and then install the script to UDEV for activation
+################################################################################
 
 [ -r "${udev_file}" ] || {
   echo
@@ -27,21 +47,32 @@ udev_file="/etc/udev/rules.d/90-$(basename ${0}).rules"
 # Power switch script
 ################################################################################
 
-s76='/usr/bin/system76-power'
 
 profile_prefix='Power Profile: '
-profile=$(${s76} profile | grep "${profile_prefix}" | sed "s/${profile_prefix}//g" | tr '[:upper:]' '[:lower:]') # possible values: battery, balanced, performance
+profile=$(${s76power} profile | grep "${profile_prefix}" | sed "s/${profile_prefix}//g" | tr '[:upper:]' '[:lower:]') # possible values: battery, balanced, performance
 
 if /usr/sbin/on_ac_power; then
 
   [ "${profile}" != "performance" ] && {
-    ${s76} profile performance
+
+    "${s76power}" profile performance
+
+    [ -r "${brightness_screen_file}" ] && cat "${brightness_screen_file}" > "${brightness_screen_kern}"
+    [ -r "${brightness_kbd_file}" ] && cat "${brightness_kbd_file}" > "${brightness_kbd_kern}"
+  
   }
 
 else
 
   [ "${profile}" = "performance" ] && {
-    ${s76} profile battery
+
+    [ -n "${brightness_screen_kern}" ] && cp "${brightness_screen_kern}" "${brightness_screen_file}"
+    [ -n "${brightness_kbd_kern}" ] && cp "${brightness_kbd_kern}" "${brightness_kbd_file}"
+
+    "${s76power}" profile battery
+
+    [ $(cat "${brightness_kbd_file}") -gt 0 ] && echo "${brightness_kbd_min}" > "${brightness_kbd_kern}"
+
   }
 
 fi
