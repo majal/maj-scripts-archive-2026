@@ -1,0 +1,46 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+
+# source $HOME/bin/maj-source
+
+################################################################################
+# Power switch script - run once
+################################################################################
+
+s76='/usr/bin/system76-power'
+
+profile_prefix='Power Profile: '
+profile=$(${s76} profile | grep "${profile_prefix}" | sed "s/${profile_prefix}//g" | tr '[:upper:]' '[:lower:]') # possible values: battery, balanced, performance
+
+if /usr/sbin/on_ac_power; then
+
+  [ "${profile}" != "performance" ] && {
+    ${s76} profile performance
+  }
+
+else
+
+  [ "${profile}" = "performance" ] && {
+    ${s76} profile battery
+  }
+
+fi
+
+################################################################################
+# Check for udev rules - installs the script to UDEV for activation
+################################################################################
+
+udev_file="/etc/udev/rules.d/90-$(basename ${0}).rules"
+
+[ -r "${udev_file}" ] || {
+  echo
+  echo "UDEV rules file not found. Installing..."
+  echo
+  echo "Writing: ${udev_file}"
+  echo 'SUBSYSTEM=="power_supply", ATTR{online}=="0", RUN+="'${0}'"' | sudo tee    "${udev_file}"
+  echo 'SUBSYSTEM=="power_supply", ATTR{online}=="1", RUN+="'${0}'"' | sudo tee -a "${udev_file}"
+  echo
+  echo "$ cat ${udev_file}"
+  cat "${udev_file}"
+  echo
+}
