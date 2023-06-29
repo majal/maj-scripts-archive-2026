@@ -4,7 +4,27 @@
 # source $HOME/bin/maj-source
 
 ################################################################################
-# Power switch script - run once
+# Check for udev rules - installs the script to UDEV for activation
+################################################################################
+
+udev_file="/etc/udev/rules.d/90-$(basename ${0}).rules"
+
+[ -r "${udev_file}" ] || {
+  echo
+  echo "UDEV rules file not found. Installing..."
+  echo
+  echo "Writing: ${udev_file}"
+  echo
+  echo 'SUBSYSTEM=="power_supply", ATTR{online}=="0", RUN+="'${0}'"' | sudo tee    "${udev_file}"
+  echo 'SUBSYSTEM=="power_supply", ATTR{online}=="1", RUN+="'${0}'"' | sudo tee -a "${udev_file}"
+  echo
+  echo "$ cat ${udev_file}"
+  cat "${udev_file}"
+  echo
+}
+
+################################################################################
+# Power switch script
 ################################################################################
 
 s76='/usr/bin/system76-power'
@@ -25,22 +45,3 @@ else
   }
 
 fi
-
-################################################################################
-# Check for udev rules - installs the script to UDEV for activation
-################################################################################
-
-udev_file="/etc/udev/rules.d/90-$(basename ${0}).rules"
-
-[ -r "${udev_file}" ] || {
-  echo
-  echo "UDEV rules file not found. Installing..."
-  echo
-  echo "Writing: ${udev_file}"
-  echo 'SUBSYSTEM=="power_supply", ATTR{online}=="0", RUN+="'${0}'"' | sudo tee    "${udev_file}"
-  echo 'SUBSYSTEM=="power_supply", ATTR{online}=="1", RUN+="'${0}'"' | sudo tee -a "${udev_file}"
-  echo
-  echo "$ cat ${udev_file}"
-  cat "${udev_file}"
-  echo
-}
