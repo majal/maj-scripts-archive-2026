@@ -1,0 +1,40 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+
+[ -r "/home/maj/bin/maj-source" ] && source "/home/maj/bin/maj-source"
+
+book="${1}"
+chapter="${2}"
+verse="${3}"
+
+[ -z "${3}" ] && errx "Usage: $(basename ${0}) <book_num> <chapter> <verse>" 1
+
+dir='/home/maj/._nosnapshot/Videos/SL/Publications/nwt/nwt_info'
+cd "${dir}"
+
+echo
+
+for file in videos_nwt_*.json; do
+  
+  lang=${file#videos_nwt_}
+  lang=${lang%.json}
+
+  vid_lang=$(jq -rn 'input | .languages.'${lang}'.name' "${file}" 2>/dev/null)
+  vid_marker=$(jq '.files.'${lang}'.MP4[] | select(.label == "720p") | .markers | select(.bibleBookNumber == '${book}' and .bibleBookChapter == '${chapter}') | .markers[] | select(.verseNumber == '${verse}')' "${file}" 2>/dev/null)
+  vid_url=$(jq -r '.files.'${lang}'.MP4[] | select(.label=="720p" and .markers.bibleBookNumber == '${book}' and .markers.bibleBookChapter == '${chapter}') | .file.url' "${file}" 2>/dev/null)
+  start_time=$(echo "${vid_marker}" | jq -r '.startTime')
+  duration=$(echo "${vid_marker}" | jq -r '.duration')
+
+  [ -n "${vid_marker}" ] && {
+
+    echo "${file}"
+    echo-r "${vid_lang}"
+    echo "${vid_marker}" | jq
+    echo-g "${vid_url}"
+    echo-y " mpv --keep-open=always --resume-playback=no --save-position-on-quit=no --start=${start_time} --length=${duration} ${vid_url}"
+
+    echo
+
+  }
+
+done

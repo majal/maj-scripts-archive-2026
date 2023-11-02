@@ -1,0 +1,93 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+
+[ -r "/home/maj/bin/maj-source" ] && source "/home/maj/bin/maj-source"
+
+unique_script
+
+################################################################################
+
+# dir="${HOME}/Desktop/nwt_sl"
+dir="/home/share/http-share/nwt_sl"
+
+dl_api="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
+outfmt="json"
+pub="nwt"
+format="MP4" # URL encoded, ie: MP4%2CM4V
+
+langs=("SLV" "BVL" "ASL" "SPE")
+
+parallel_langs=4
+parallel_ffmpeg=6
+
+################################################################################
+
+process_lang() {
+
+  lang=${1^^} # Uppercase
+
+  dir_lang="${dir}/${pub}_${lang}-60fps"
+  [ -d "${dir_lang}" ] || mkdir -p "${dir_lang}"
+  cd "${dir_lang}"
+
+  data_full="${dir_lang}/data_full_nwt_${lang}.json"
+  [ -s "${data_full}" ] && mv "${data_full}" "${data_full}.prev" && truncate -s 0 "${data_full}"
+
+  for n in {1..66}; do
+    # echo "${lang} ${n}"
+    curl -sf "${dl_api}?output=${outfmt}&pub=${pub}&fileformat=${format}&alllangs=0&langwritten=${lang}&txtCMSLang=${lang}&booknum=${n}" >> "${data_full}"
+  done
+
+  data_dl="${dir_lang}/data_dl_nwt_${lang}.csv"
+  cat "${data_full}" | jq '.files.'${lang}'.MP4[] | select(.label=="720p") | .file' | jq -s . | \
+    jq -r 'map({checksum, url}) | (map(keys) | add | unique) as $cols | map(. as $row | $cols | map($row[.])) as $rows | $cols, $rows[] | @csv' > "${data_dl}"
+  
+  data_processed="${dir_lang}/data_processed_nwt_${lang}.csv"
+  [ -f "${data_processed}" ] || touch "${data_processed}"
+
+  data_toprocess="$(mktemp -u --tmpdir $(basename ${0}).XXXXXXXXXX)"
+
+  grep -vFf <(cat "${data_processed}" | cut -d , -f 1) "${data_dl}" > "${data_toprocess}"
+
+  cat "${data_toprocess}" | \
+  while read data; do
+
+    while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+      sleep 1
+    done
+
+    url="$(echo ${data} | cut -d , -f 2 | tr -d '"')"
+
+    echo "${url}" | grep -q "https" || continue
+
+    ff='/usr/bin/ffmpeg'
+    ff_banner='-hide_banner -loglevel level+warning'
+    filter="minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
+    ff_opts_post="-y -c:a copy -c:v libx264 -c:s mov_text -crf 20 -preset slow -nostdin"
+
+    file_save="${dir_lang}/"$(basename "${url}")
+
+    "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
+  
+  done
+
+  # rm "${data_toprocess}"
+
+}
+
+################################################################################
+
+[ -d "${dir}" ] || mkdir -p "${dir}"
+cd "${dir}"
+
+
+for a in ${langs[@]}; do
+  
+  ( process_lang "${a}" ) &
+  [ $(jobs -r -p | wc -l) -ge ${parallel_langs} ] && wait -n
+
+done
+
+wait
+
+beep
