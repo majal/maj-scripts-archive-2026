@@ -7,6 +7,8 @@ book="${1}"
 chapter="${2}"
 verse="${3}"
 
+mpv_no="${4}"
+
 [ -z "${3}" ] && errx "Usage: $(basename ${0}) <book_num> <chapter> <verse>" 1
 
 mpv_count=2
@@ -37,11 +39,15 @@ for file in videos_nwt_*.json; do
 
     echo
 
-    mpv --pause=yes --keep-open=always --resume-playback=no --focus-on-open=no --window-minimized=yes --osd-playing-msg="${vid_sl}" --osd-duration=3600000 --save-position-on-quit=no --start=${start_time} --length=${duration} ${vid_url} &
+    [ -z "${mpv_no}" ] && {
 
-    while [ $(jobs -r -p | wc -l) -ge ${mpv_count} ]; do sleep 1; done
+      mpv --pause=yes --keep-open=always --resume-playback=no --focus-on-open=no --window-minimized=yes --osd-playing-msg="${vid_sl}" --osd-duration=3600000 --save-position-on-quit=no --start=${start_time} --length=${duration} ${vid_url} &
 
-    echo
+      while [ $(jobs -r -p | wc -l) -ge ${mpv_count} ]; do sleep 1; done
+    
+      echo
+
+    }
 
   }
 
