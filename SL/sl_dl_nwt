@@ -17,7 +17,9 @@ format="MP4" # URL encoded, ie: MP4%2CM4V
 
 langs=("SLV" "BVL" "ASL" "SPE")
 
+# Limits parallel curl requests
 parallel_langs=4
+# Limits parallel ffmpeg CPU cores
 parallel_ffmpeg=6
 
 ################################################################################
@@ -52,8 +54,9 @@ process_lang() {
   cat "${data_toprocess}" | \
   while read data; do
 
-    while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
-      sleep 1
+    # while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+    while [ $(ps h -eo s,comm | awk '{ if ($1 == "R") print $2; }' | grep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+      sleep 2
     done
 
     url="$(echo ${data} | cut -d , -f 2 | tr -d '"')"
