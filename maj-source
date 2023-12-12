@@ -1,0 +1,96 @@
+##### Majal's bash source functions #####
+
+### COLORS ###
+
+function echo-rb () {
+  COLOR='\033[1;91m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-r () {
+  COLOR='\033[91m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-gb () {
+  COLOR='\033[1;92m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-g () {
+  COLOR='\033[92m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-yb () {
+  COLOR='\033[1;93m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-y () {
+  COLOR='\033[93m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-bb () {
+  COLOR='\033[1;94m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+function echo-b () {
+  COLOR='\033[94m'
+  NC='\033[0m'
+  printf "${COLOR}$1${NC}\n"
+}
+
+
+### FUNCTIONS ###
+# errx
+# runroot
+# unique_script
+# checkonline
+# majbanner
+
+function errx () {
+  echo-r "$1"
+  echo-y "Exiting with error code: $2"
+  echo
+  exit $2
+}
+
+function runroot () {
+  [ $EUID -ne 0 ] && { echo; exec /usr/bin/sudo "$0" "$@"; }
+}
+
+function unique_script () {
+  instancecount=$(pgrep -xc $(echo $(basename "${0}") | head -c 15))
+  [ "${instancecount}" ] && [ "${instancecount}" -gt 1 ] && errx "$(basename ${0}): Multiple instances (${instancecount}) found, exiting..." 0
+}
+
+function maj-online () {
+  ipaddr='8.8.8.8'
+  $([ -z "`ping -c1 $ipaddr |& grep -o 'Network is unreachable'`" ] || exit 1; [ -z "`ping -c3 $ipaddr |& grep -o '100% packet loss'`" ] && exit 0 || exit 2)
+}
+
+function checkonline () {
+  printf "Checking connectivity... "
+  maj-online && echo-g "online." || errx "offline." 102
+}
+
+function majbanner () {
+  echo
+  echo -e "   Running Maj script: \e[1;93m`basename $0`\e[0m"
+  echo-y "   _____  _____  _____"
+  echo
+}
+
+### BANNER ###
+
+[ $EUID -eq 0 ] || majbanner

@@ -1,7 +1,10 @@
 #!/bin/bash
 
-[[ -z "$1" ]] && echo "Please enter a filename. Exiting..."
-[[ -z "$1" ]] && exit 1
+[ -z "$1" ] && echo "Please enter a filename. Exiting..."
+[ -z "$1" ] && exit 1
+
+dir="$(mktemp -ud | sed 's/tmp\./pdflat./')"
+[ -d "${dir}" ] || mkdir "${dir}"
 
 echo
 echo -e "\e[1mThis will flatten the following PDFs:\e[0m"
@@ -14,13 +17,26 @@ echo -e "\e[1m\e[32mPress [Enter] to continue... \e[31m[Ctrl+C to cancel]\e[0m"
 read
 printf "Flattening... "
 
-for a in "$@"; do mv "$a" "${a%.pdf}.orig.pdf"; done
+for a in "$@"; do mv "${a}" "${dir}/${a}"; done
 
-for b in *.orig.pdf; do cc=$((cc+1)); printf "\rFlattening... $cc of $c"; gs -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOCACHE -sDEVICE=pdfwrite -sColorConversionStrategy=/LeaveColorUnchanged -dAutoFilterColorImages=true -dAutoFilterGrayImages=true -dDownsampleMonoImages=true -dDownsampleGrayImages=true -dDownsampleColorImages=true -sOutputFile="${b%.orig.pdf}.pdf" "$b"; done
+for b in "${dir}/"*".pdf"; do
+  cc=$((cc+1))
+  printf "\rFlattening... $cc of $c"
+  gs -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOCACHE -sDEVICE=pdfwrite -dPreserveAnnots=false -sOutputFile="$(basename "${b}")" "$b"
+done
 
-[[ -d ./orig ]] || mkdir orig
-mv *.orig.pdf orig/
 echo ". Done."
 echo
-echo "Originals moved to orig folder"
+
+echo -e "Originals can be found here: \e[93m${dir}\e[0m"
 echo
+echo -ne "\e[32mMove ${dir} to \"orig\" folder? [y/N] \e[0m"
+read yn
+echo
+
+[[ "${yn,,}" == y* ]] && {
+  [ -d orig ] || mkdir orig
+  rsync -a "${dir}/" orig/ && rm -r "${dir}"
+  echo "Moved ${dir} to orig, done."
+  echo
+}

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+[ -z "${1}" ] && exit 1
+
+full=$(echo "${1}" | tr -d '\n')
+dir=$(dirname "${full}")
+base=$(basename "${full}")
+
+mkdir -p "${dir}/orig"
+cp "${full}" "${dir}/orig"
+
+gs -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOCACHE -sDEVICE=pdfwrite -dPreserveAnnots=false \
+  -sOutputFile="${full}" "${dir}/orig/${base}"

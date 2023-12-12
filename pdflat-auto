@@ -1,0 +1,18 @@
+#!/bin/bash
+
+dir="$(mktemp -ud | sed 's/tmp\./pdflat./')"
+[ -d "${dir}" ] || mkdir "${dir}"
+
+for a in *.pdf; do mv "${a}" "${dir}/${a}"; done
+
+for b in "${dir}/"*".pdf"; do
+  cc=$((cc+1))
+  printf "\rFlattening... $cc of $c"
+  gs -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOCACHE -sDEVICE=pdfwrite -dPreserveAnnots=false -sOutputFile="$(basename "${b}")" "$b"
+done
+
+echo ". Done."
+echo
+
+[ -d orig ] || mkdir orig
+rsync -a "${dir}/" orig/ && rm -r "${dir}"
