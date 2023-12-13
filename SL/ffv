@@ -67,7 +67,8 @@ Required parameters:
                        If 'ALL' is supplied for language code, the script will
                        search on which languages the verses are available.
 
-  Bible reference      Single-chapter reference in quotation marks
+  Bible reference      Single-chapter reference in quotation marks.
+                       See examples below.
 
 Optional options:
 
@@ -79,6 +80,21 @@ Optional options:
   -w, --offset-width   ([+]/-)pixels for delogo filter text width
 
   -h, --help           Show this help text
+
+Examples:
+
+  Search in which languages the verses are available:
+
+    $(basename "${0}") all 'Psalms 1:1, 2, 4-6'
+
+  Preview possible output using ffplay:
+  (This is also a good example to experiment with the offset flags.)
+
+    $(basename "${0}") ASL \"ec 1:18\"
+
+  Encode using ffmpeg and then play file(s) using mpv:
+
+    $(basename "${0}") bvl 'Rev. 13:1, 2' -fm
 "
 
   exit 1
