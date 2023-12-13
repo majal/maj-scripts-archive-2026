@@ -1,7 +1,7 @@
 #!/bin/bash
 # https://www.majlovesreg.one/tag/code/
 
-[ -r "/home/maj/bin/maj-source" ] && source "/home/maj/bin/maj-source"
+[ -r "${HOME}/bin/maj-source" ] && source "${HOME}/bin/maj-source"
 
 ################################################################################
 # Requirements
@@ -18,14 +18,14 @@
 # Variables
 
 dir_pwd="${PWD}"
-dir_60fps='/home/maj/Videos/SL/Publications/nwt/nwt_sl_60fps'
+dir_videos="${HOME}/Videos/SL/Publications/nwt/nwt_sl_60fps"
 
 lang_tr='SLV' # All CAPS
 lang_tr_iso='vi'
 lang_iso_default='en'
 
-fontfile='/home/maj/.fonts/Sans/Noto-Sans-Display/static/NotoSansDisplay-SemiBold.ttf'
-fontfile_estimator='/home/maj/.fonts/Sans/Noto-Sans-Display/static/NotoSansDisplay-Regular.ttf'
+fontfile="${HOME}/.fonts/Sans/Noto-Sans-Display/static/NotoSansDisplay-SemiBold.ttf"
+fontfile_estimator="${HOME}/.fonts/Sans/Noto-Sans-Display/static/NotoSansDisplay-Regular.ttf"
 
 ff='ffmpeg'
 ff_banner='-hide_banner -loglevel error -stats'
@@ -108,7 +108,7 @@ done
 ################################################################################
 # Processed variables
 
-cd "${dir_60fps}"
+cd "${dir_videos}"
 langs_available=( $(ls -1d */ | grep -o '[A-Z]\{3\}') )
 
 textfile=$(mktemp --tmpdir ${tmpfile_prefix}-XXXXXXXXXX)
@@ -123,11 +123,11 @@ b="$(echo ${2} | sed 's/ [0-9]\+:[0-9, -]\+$//')"
 b_name="${b^}"
 
 # Get Bible book number from name
-[ "$b" -eq "$b" ] 2>/dev/null || b="$(jq -r '.books | to_entries | map(select(.value[] == "'${b_name}'")  | .key)[0]' ${dir_60fps}/nwtsty_${lang_iso_default}.json)"
+[ "$b" -eq "$b" ] 2>/dev/null || b="$(jq -r '.books | to_entries | map(select(.value[] == "'${b_name}'")  | .key)[0]' ${dir_videos}/nwtsty_${lang_iso_default}.json)"
 [ "$b" -eq "$b" ] 2>/dev/null || {
   for lll in ${langs_available[@]}; do
     lang_iso_lll="$(echo ${langs} | jq -r .${lll})"
-    b="$(jq -r '.books | to_entries | map(select(.value[] == "'${b_name}'")  | .key)[0]' ${dir_60fps}/nwtsty_${lang_iso_lll}.json)"
+    b="$(jq -r '.books | to_entries | map(select(.value[] == "'${b_name}'")  | .key)[0]' ${dir_videos}/nwtsty_${lang_iso_lll}.json)"
     [ "$b" -eq "$b" ] 2>/dev/null && break
   done
 }
@@ -139,7 +139,7 @@ bb=$(printf "%02d" ${b})
 c="$(echo ${2} | sed -e 's/^.* \(.*\):.*$/\1/')"
 cc=$(printf "%02d" ${c})
 
-overlay_book="$(jq -r '.books."'${b}'".standardSingularBookName' ${dir_60fps}/nwtsty_${lang_tr_iso}.json)"
+overlay_book="$(jq -r '.books."'${b}'".standardSingularBookName' ${dir_videos}/nwtsty_${lang_tr_iso}.json)"
 
 ################################################################################
 # Put the verses into an array
@@ -170,8 +170,8 @@ done
 
   for ll in ${langs_available[@]}; do
 
-    video_file="$(ls ${dir_60fps}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
-    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_60fps}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
+    video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
     [ -z "${video_file}" ] && continue
 
     for vvv in ${vss[@]}; do
@@ -213,13 +213,13 @@ done
 
   cd "${dir_pwd}"
 
-  [ -d "${dir_60fps}/nwt_${ll}-60fps" ] || errx "Language ${ll} not found! Use scripts sl_dl_nwt_info and sl_dl_nwt?" 4
-  [ -r "${dir_60fps}/nwtsty_${lang_tr_iso}.json" ] || errx "Translation info not found: ${dir_60fps}/nwtsty_${lang_tr_iso}.json" 7
+  [ -d "${dir_videos}/nwt_${ll}-60fps" ] || errx "Language ${ll} not found! Use scripts sl_dl_nwt_info and sl_dl_nwt?" 4
+  [ -r "${dir_videos}/nwtsty_${lang_tr_iso}.json" ] || errx "Translation info not found: ${dir_videos}/nwtsty_${lang_tr_iso}.json" 7
 
-  overlay_book_estimator="$(jq -r '.books."'${b}'".standardSingularBookName' ${dir_60fps}/nwtsty_${lang_iso}.json)"
+  overlay_book_estimator="$(jq -r '.books."'${b}'".standardSingularBookName' ${dir_videos}/nwtsty_${lang_iso}.json)"
 
-  video_file="$(ls ${dir_60fps}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
-  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_60fps}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
+  video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
+  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
   [ -z "${video_file}" ] && errx "${b_name} chapter ${c} not available in ${ll}" 5 || { echo-b "Source video file:  '${video_file}'"; echo; }
 
   for vvv in ${vss[@]}; do
@@ -230,7 +230,7 @@ done
     start_time=
     end_time=
 
-    filename_output="${dir_pwd}/$(echo $(jq -r '.books."'${b}'".standardSingularBookName' ${dir_60fps}/nwtsty_${lang_iso_default}.json) ${c}:${vvv} - ${ll} - VI60.mp4 | \
+    filename_output="${dir_pwd}/$(echo $(jq -r '.books."'${b}'".standardSingularBookName' ${dir_videos}/nwtsty_${lang_iso_default}.json) ${c}:${vvv} - ${ll} - VI60.mp4 | \
       sed 's#[<>:"/\|?*]#_#g')" # Sanitize file names
 
     # If verse is number, single verse only
