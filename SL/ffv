@@ -139,11 +139,12 @@ b="$(echo ${2} | sed 's/ [0-9]\+:[0-9, -]\+$//')"
 b_name="${b^}"
 
 # Get Bible book number from name
-[ "$b" -eq "$b" ] 2>/dev/null || b="$(jq -r '.books | to_entries | map(select(.value[] == "'${b_name}'")  | .key)[0]' ${dir_videos}/nwtsty_${lang_iso_default}.json)"
+[ "$b" -eq "$b" ] 2>/dev/null || b=$(jq -r ".books | to_entries | map(select(.value[] == \"${b_name}\")  | .key)[0]" ${dir_videos}/nwtsty_${lang_iso_default}.json)
 [ "$b" -eq "$b" ] 2>/dev/null || {
   for lll in ${langs_available[@]}; do
     lang_iso_lll="$(echo ${langs} | jq -r .${lll})"
-    b="$(jq -r '.books | to_entries | map(select(.value[] == "'${b_name}'")  | .key)[0]' ${dir_videos}/nwtsty_${lang_iso_lll}.json)"
+    b=$(jq -r ".books | to_entries | map(select(.value[] == \"${b_name}\")  | .key)[0]" ${dir_videos}/nwtsty_${lang_iso_lll}.json)
+    echo-r "${b}"
     [ "$b" -eq "$b" ] 2>/dev/null && break
   done
 }
@@ -188,6 +189,11 @@ done
 
     video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
     [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
+
+    # Old formats
+    [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r480P.m4v 2>/dev/null)"
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r480P.m4v 2>/dev/null)" # Psalms
+
     [ -z "${video_file}" ] && continue
 
     for vvv in ${vss[@]}; do
@@ -236,7 +242,20 @@ done
 
   video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
   [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
+  
+  # Old formats    
+  [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r480P.m4v 2>/dev/null)"
+  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r480P.m4v 2>/dev/null)" # Psalms
+
   [ -z "${video_file}" ] && errx "${b_name} chapter ${c} not available in ${ll}" 5 || { echo-b "Source video file:  '${video_file}'"; echo; }
+
+  echo ${video_file} | grep -q "_r480P\." && {
+        
+    x=$(echo "${x} * 480 / 720" | bc)
+    y=$(echo "${y} * 480 / 720" | bc)
+    s=$(echo "${s} * 480 / 720" | bc)
+
+  }
 
   for vvv in ${vss[@]}; do
     
@@ -347,8 +366,8 @@ done
         w=$(identify -format "%w" "${imagefile_est}")
         h=$(identify -format "%h" "${imagefile_est}")
 
-        delogo="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+10 )):show=0,"
-        delogo_show="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+10 )):show=1,"
+        delogo="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=0,"
+        delogo_show="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=1,"
 
         drawtext="drawtext=textfile="${textfile}":fontfile="${fontfile}":fontcolor=white:fontsize=${s}:x=${x}:y=${y}:alpha=${a},"
 
@@ -374,8 +393,8 @@ done
           # On 60 fps one frame is 0.016666667 s
           [ "${v}" -eq "${v_end}" ] && filter_end=$(echo "${end_time[v]} + 0.02" | bc) || filter_end=${end_time[v]}
 
-          delogo+="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+10 )):show=0:enable='between(t,${start_time[v]},${filter_end})',"
-          delogo_show+="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+10 )):show=1:enable='between(t,${start_time[v]},${filter_end})',"
+          delogo+="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=0:enable='between(t,${start_time[v]},${filter_end})',"
+          delogo_show+="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=1:enable='between(t,${start_time[v]},${filter_end})',"
 
           drawtext+="drawtext=textfile="${textfile}-${v}":fontfile="${fontfile}":fontcolor=white:fontsize=${s}:x=${x}:y=${y}:alpha=${a}:enable='between(t,${start_time[v]},${filter_end})',"
 
