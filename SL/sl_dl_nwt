@@ -13,7 +13,7 @@ dir="/home/share/http-share/nwt_sl"
 dl_api="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
 outfmt="json"
 pub="nwt"
-format="MP4" # URL encoded, ie: MP4%2CM4V
+format="MP4%2CM4V" # URL encoded, ie: MP4%2CM4V
 
 langs=("SLV" "BVL" "ASL" "SPE")
 
@@ -36,13 +36,18 @@ process_lang() {
   [ -s "${data_full}" ] && mv "${data_full}" "${data_full}.prev" && truncate -s 0 "${data_full}"
 
   for n in {1..66}; do
-    # echo "${lang} ${n}"
+    echo -n "${lang}_${n} "
     curl -sf "${dl_api}?output=${outfmt}&pub=${pub}&fileformat=${format}&alllangs=0&langwritten=${lang}&txtCMSLang=${lang}&booknum=${n}" >> "${data_full}"
+    sleep 0.5
   done
 
+  echo "${lang}_done!"
+
   data_dl="${dir_lang}/data_dl_nwt_${lang}.csv"
-  cat "${data_full}" | jq '.files.'${lang}'.MP4[] | select(.label=="720p") | .file' | jq -s . | \
+  data_part=$(jq '.files.'${lang}'.MP4[] | select(.label=="720p") | .file | select(.url | endswith(".mp4"))' "${data_full}" 2>/dev/null) && echo "${data_part}" | jq -s . | \
     jq -r 'map({checksum, url}) | (map(keys) | add | unique) as $cols | map(. as $row | $cols | map($row[.])) as $rows | $cols, $rows[] | @csv' > "${data_dl}"
+  data_part=$(jq '.files.'${lang}'.M4V[] | select(.label=="720p") | .file | select(.url | endswith(".m4v"))' "${data_full}" 2>/dev/null) && echo "${data_part}" | jq -s . | \
+    jq -r 'map({checksum, url}) | (map(keys) | add | unique) as $cols | map(. as $row | $cols | map($row[.])) as $rows | $cols, $rows[] | @csv' | tail -n +2 >> "${data_dl}"
   
   data_processed="${dir_lang}/data_processed_nwt_${lang}.csv"
   [ -f "${data_processed}" ] || touch "${data_processed}"
@@ -54,14 +59,14 @@ process_lang() {
   cat "${data_toprocess}" | \
   while read data; do
 
-    # while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
-    while [ $(ps h -eo s,comm | awk '{ if ($1 == "R") print $2; }' | grep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+    while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+    # while [ $(ps aux | grep /usr/bin/ffmpeg | tr -s  ' ' | cut -d ' ' -f 8 | grep -c '^R') -ge ${parallel_ffmpeg} ]; do
       sleep 2
     done
 
     url="$(echo ${data} | cut -d , -f 2 | tr -d '"')"
 
-    echo "${url}" | grep -q "https" || continue
+    echo "${url}" | grep -Eq "^https.*(mp4|m4v)$" || continue
 
     ff='/usr/bin/ffmpeg'
     ff_banner='-hide_banner -loglevel level+warning'
@@ -70,11 +75,11 @@ process_lang() {
 
     file_save="${dir_lang}/"$(basename "${url}")
 
-    "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
+    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
   
   done
 
-  # rm "${data_toprocess}"
+  rm "${data_toprocess}"
 
 }
 

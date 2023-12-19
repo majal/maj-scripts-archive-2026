@@ -191,6 +191,9 @@ done
     [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
 
     # Old formats
+    [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.m4v 2>/dev/null)"
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.m4v 2>/dev/null)" # Psalms
+
     [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r480P.m4v 2>/dev/null)"
     [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r480P.m4v 2>/dev/null)" # Psalms
 
@@ -244,6 +247,9 @@ done
   [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
   
   # Old formats    
+  [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.m4v 2>/dev/null)"
+  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.m4v 2>/dev/null)" # Psalms
+
   [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r480P.m4v 2>/dev/null)"
   [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r480P.m4v 2>/dev/null)" # Psalms
 

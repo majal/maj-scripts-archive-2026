@@ -10,7 +10,7 @@ dir='/home/maj/._nosnapshot/Videos/SL/Publications/nwt/nwt_info/'
 dl_api="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
 outfmt="json"
 pub="nwt"
-format="MP4" # URL encoded, ie: MP4%2CM4V
+format="MP4%2CM4V" # URL encoded, ie: MP4%2CM4V
 
 parallel_langs=4
 
