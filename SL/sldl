@@ -158,7 +158,7 @@ while read data; do
       sleep 1
     done
 
-    echo "Reencoding ${url} to ${fps} fps and saving to ${file_save}"
+    echo "Reencoding ${url} to ${fps} fps and saving to ${file_save} …"
     nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
 
   } || {
@@ -167,7 +167,7 @@ while read data; do
       sleep 1
     done
 
-    echo "Downloading ${url} and saving to ${file_save}"
+    echo "Downloading ${url} and saving to ${file_save} …"
     wget -qO "${file_save}" -o /dev/null "${url}" && echo "${data}" >> "${data_processed}" &
 
   }
