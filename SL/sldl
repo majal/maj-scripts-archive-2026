@@ -1,0 +1,179 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+
+[ -r "${HOME}/bin/maj-source" ] && source "${HOME}/bin/maj-source"
+
+unique_script
+
+################################################################################
+# Requirements
+
+[ -x "$(which jq)" ] || errx "Required program not found: jq" 2            
+[ -x "$(which getopt)" ] || errx "Required program not found: getopt" 2            
+[ -x "$(which ffmpeg)" ] || errx "Required program not found: ffmpeg" 2
+
+################################################################################
+# Variables for edit
+
+# dir="${HOME}/Videos/SL/Publications" # Desktop
+dir="/home/share/http-share" # Server
+
+format="MP4" # URL encoded, ie: MP4%2CM4V
+
+parallel_dl=2 # Limits parallel download requests
+parallel_ffmpeg=6 # Limits parallel ffmpeg CPU cores
+
+ff='/usr/bin/ffmpeg'
+ff_banner='-hide_banner -loglevel level+error'
+ff_opts_post="-y -c:a copy -c:v libx264 -c:s mov_text -crf 20 -preset slow -nostdin"
+
+################################################################################
+# Usage and options
+
+function usage {
+
+  echo "
+Usage: $(basename "${0}") <SL language code> <Publication code> [Additional options]
+
+Required parameters:
+
+  SL language code    https://www.jw.org/en/languages
+
+  Publication code    Mnemonic: https://www.jw.org/finder?docid=1200270068
+
+Optional options:
+
+  -f, --fps           Frames per second. Recode using FFmpeg minterpolate.
+  -d, --dir           Save to specified directory. Otherwise save to default:
+                      ${dir}/\${pub}_\${LANG}[-XXfps]
+
+  -h, --help         Show this help text
+
+Examples:
+
+  Download \"Enjoy Life Forever!\" in SLV, save to default directory:
+
+    $(basename "${0}") slv lff
+
+  Recode ASL \"Love People\" to 60 fps:
+
+    $(basename "${0}") ASL LMD -f 60
+
+  Save BVL \"Learn From the Bible\" to selected directory:
+
+    $(basename "${0}") BVL lfb -d \"${HOME}/Videos/MyLessons\"
+"
+
+  exit 1
+
+}
+
+options=$(getopt -o f:,d:,h -l fps:,dir:,help -n "$(basename ${0})" -- "$@")
+[ ${?} -eq 0 ] || usage
+
+eval set -- "$options"
+
+while :; do
+  case "${1}" in
+
+    -f|--fps)
+      shift
+      [ "${1}" -eq "${1}" ] 2>/dev/null && fps="${1}" || { echo-r "Error: --fps must be an integer"; usage; }
+      ;;
+
+    -d|--dir)
+      shift
+      dir_custom="${1}"
+      ;;
+
+    -h|--help)
+      usage
+      ;;
+
+    --)
+      shift
+      break
+      ;;
+
+  esac
+  shift
+done
+
+[ -z "${2}" ] && usage
+
+################################################################################
+# Processed/defined variables
+
+dl_api="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
+outfmt="json"
+
+lang="${1^^}"
+pub="${2,,}"
+
+dl_url="${dl_api}?output=${outfmt}&pub=${pub}&fileformat=${format}&alllangs=0&langwritten=${lang}&txtCMSLang=${lang}"
+
+filter="minterpolate=fps=${fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
+
+################################################################################
+
+[ "${fps}" ] && dir="${dir}/${pub}_${lang}-${fps}fps" || dir="${dir}/${pub}_${lang}"
+[ "${dir_custom}" ] && dir="${dir_custom}"
+
+echo "${dir}"
+
+[ -d "${dir}" ] || mkdir -p "${dir}"
+cd "${dir}"
+
+data_full="${dir}/${pub}_${lang}.json"
+
+data_full_tmp="$(mktemp -u --tmpdir $(basename ${0}).XXXXXXXXXX)"
+
+curl -sf "${dl_url}" > "${data_full_tmp}" && {
+  [ -s "${data_full}" ] && mv "${data_full}" "${data_full}.prev"
+  mv "${data_full_tmp}" "${data_full}"
+}
+
+data_dl="${dir}/${pub}_${lang}.csv"
+
+data_part=$(jq '.files.'${lang}'.MP4[] | select(.label=="720p") | .file | select(.url | endswith(".mp4"))' "${data_full}") && echo "${data_part}" | jq -s . | \
+  jq -r 'map({checksum, url}) | (map(keys) | add | unique) as $cols | map(. as $row | $cols | map($row[.])) as $rows | $cols, $rows[] | @csv' > "${data_dl}"
+
+data_processed="${dir}/${pub}_${lang}_processed.csv"
+[ -f "${data_processed}" ] || touch "${data_processed}"
+
+data_toprocess="$(mktemp -u --tmpdir $(basename ${0}).XXXXXXXXXX)"
+
+grep -vFf <(cat "${data_processed}" | cut -d , -f 1) "${data_dl}" > "${data_toprocess}"
+
+cat "${data_toprocess}" | \
+while read data; do
+
+  url="$(echo ${data} | cut -d , -f 2 | tr -d '"')"
+  echo "${url}" | grep -Eq "^https.*(mp4|m4v)$" || continue
+  file_save="${dir}/"$(basename "${url}")
+
+  [ "${fps}" ] && {
+    
+    while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+      sleep 1
+    done
+
+    echo "Reencoding ${url} to ${fps} fps and saving to ${file_save}"
+    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
+
+  } || {
+
+    while [ $(pgrep -c wget) -ge ${parallel_dl} ]; do
+      sleep 1
+    done
+
+    echo "Downloading ${url} and saving to ${file_save}"
+    wget -qO "${file_save}" -o /dev/null "${url}" && echo "${data}" >> "${data_processed}" &
+
+  }
+
+done
+
+rm "${data_toprocess}"
+
+beep
