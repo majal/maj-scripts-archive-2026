@@ -37,17 +37,25 @@ Usage: $(basename "${0}") <SL language code> <Publication code> [Additional opti
 
 Required parameters:
 
-  SL language code    https://www.jw.org/en/languages
+  SL language code  https://www.jw.org/en/languages
 
-  Publication code    Mnemonic: https://www.jw.org/finder?docid=1200270068
+  Publication code  Mnemonic: https://www.jw.org/finder?docid=1200270068
 
 Optional options:
 
-  -f, --fps           Frames per second. Recode using FFmpeg minterpolate.
-  -d, --dir           Save to specified directory. Otherwise save to default:
-                      ${dir}/\${pub}_\${LANG}[-XXfps]
+  -f, --fps         (Integer) Frames per second.
+                    Recode using FFmpeg minterpolate.
 
-  -h, --help         Show this help text
+  -d, --dir         (Path) Save to specified directory. Otherwise save to:
+                    ${dir}/\${pub}_\${LANG}[-XXfps]
+
+  -o, --onthefly    Request URL directly using FFmpeg, no need of separate
+                    download and temporary files. This setting may sometimes
+                    error out if the server or CDN cuts the download after some
+                    timeout limit. Reencoding takes time, especially for large
+                    files. -o works only if --fps is set, otherwise ignored.
+
+  -h, --help        Show this help text
 
 Examples:
 
@@ -55,9 +63,9 @@ Examples:
 
     $(basename "${0}") slv lff
 
-  Recode ASL \"Love People\" to 60 fps:
+  Recode ASL \"Love People\" to 60 fps using on-the-fly download:
 
-    $(basename "${0}") ASL LMD -f 60
+    $(basename "${0}") ASL LMD -f 60 -o
 
   Save BVL \"Learn From the Bible\" to selected directory:
 
@@ -68,7 +76,7 @@ Examples:
 
 }
 
-options=$(getopt -o f:,d:,h -l fps:,dir:,help -n "$(basename ${0})" -- "$@")
+options=$(getopt -o f:,d:,o,h -l fps:,dir:,onthefly,help -n "$(basename ${0})" -- "$@")
 [ ${?} -eq 0 ] || usage
 
 eval set -- "$options"
@@ -84,6 +92,10 @@ while :; do
     -d|--dir)
       shift
       dir_custom="${1}"
+      ;;
+
+    -o|--onthefly)
+      onthefly=true
       ;;
 
     -h|--help)
@@ -157,9 +169,32 @@ while read data; do
     while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
       sleep 1
     done
+  
+    [ "${onthefly}" ] && {
+    
+      echo "Reencoding ${url} to ${fps} fps and saving to ${file_save} …"
+      nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
+    
+    } || {
 
-    echo "Reencoding ${url} to ${fps} fps and saving to ${file_save} …"
-    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
+      while [ $(pgrep -c wget) -ge ${parallel_dl} ]; do
+        sleep 1
+      done
+
+      echo "Downloading ${url} and then reencoding to ${fps} fps. Saving to ${file_save} …"
+
+      wget -qO "${file_save}.recode" -o /dev/null "${url}" && \
+      nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${file_save}.recode" -vf "${filter}" ${ff_opts_post} "${file_save}" && \
+      echo "${data}" >> "${data_processed}" && \
+      rm "${file_save}.recode" &
+
+      sleep 1 # Allow time for wget to write save file, prevent race condition on parallel_ffmpeg count
+
+      while [ $(ls *.recode 2>/dev/null | wc -l) -ge ${parallel_ffmpeg} ]; do
+        sleep 1
+      done
+      
+    }
 
   } || {
 
