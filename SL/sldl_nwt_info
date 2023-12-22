@@ -1,0 +1,46 @@
+#!/bin/bash
+# https://www.majlovesreg.one/tag/code/
+
+[ -r "/home/maj/bin/maj-source" ] && source "/home/maj/bin/maj-source"
+
+unique_script
+
+dir='/home/maj/._nosnapshot/Videos/SL/Publications/nwt/nwt_info/'
+
+dl_api="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
+outfmt="json"
+pub="nwt"
+format="MP4%2CM4V" # URL encoded, ie: MP4%2CM4V
+
+parallel_langs=4
+
+lang_codes="$(curl -s 'https://data.jw-api.org/mediator/v1/languages/E/all' | jq -r '.languages | map(select(.isSignLanguage == true)) | map(.code)[]')"
+
+################################################################################
+
+process_lang() {
+
+  lang=${1^^} # Uppercase
+
+  file_lang="${dir}/videos_nwt_${lang}.json"
+  [ -s "${file_lang}" ] && mv "${file_lang}" "${file_lang}.prev" && truncate -s 0 "${file_lang}"
+
+  for n in {1..66}; do
+    echo -n "${lang}_${n} "
+    curl -sf "${dl_api}?output=${outfmt}&pub=${pub}&fileformat=${format}&alllangs=0&langwritten=${lang}&txtCMSLang=${lang}&booknum=${n}" >> "${file_lang}"
+  done
+
+}
+
+################################################################################
+
+for c in ${lang_codes[@]}; do
+  
+  ( process_lang "${c}" ) &
+  [ $(jobs -r -p | wc -l) -ge ${parallel_langs} ] && wait -n
+
+done
+
+wait
+
+beep

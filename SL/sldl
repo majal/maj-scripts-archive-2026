@@ -25,7 +25,7 @@ parallel_ffmpeg=6 # Limits parallel ffmpeg CPU cores
 
 ff='/usr/bin/ffmpeg'
 ff_banner='-hide_banner -loglevel level+error'
-ff_opts_post="-y -c:a copy -c:v libx264 -c:s mov_text -crf 20 -preset slow -nostdin"
+ff_opts_post="-y -c:a copy -c:v libx264 -c:s mov_text -crf 20 -preset slow -nostdin -xerror"
 
 ################################################################################
 # Usage and options
