@@ -61,18 +61,24 @@ process_lang() {
   cat "${data_toprocess}" | \
   while read data; do
 
-    while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
-    # while [ $(ps aux | grep /usr/bin/ffmpeg | tr -s  ' ' | cut -d ' ' -f 8 | grep -c '^R') -ge ${parallel_ffmpeg} ]; do
-      sleep 2
-    done
-
     url="$(echo ${data} | cut -d , -f 2 | tr -d '"')"
-
     echo "${url}" | grep -Eq "^https.*(mp4|m4v)$" || continue
-
     file_save="${dir_lang}/"$(basename "${url}")
 
-    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${url}" -vf "${filter}" ${ff_opts_post} "${file_save}" && echo "${data}" >> "${data_processed}" &
+    while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
+      sleep 1
+    done
+
+    wget -qO "${file_save}.recode" -o /dev/null "${url}" && \
+    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${file_save}.recode" -vf "${filter}" ${ff_opts_post} "${file_save}" && \
+    echo "${data}" >> "${data_processed}" && \
+    rm "${file_save}.recode" &
+
+    sleep 1 # Allow time for wget to write save file, prevent race condition on parallel_ffmpeg count
+
+    while [ $(ls "${dir_lang}/"*.recode 2>/dev/null | wc -l) -ge ${parallel_ffmpeg} ]; do
+      sleep 1
+    done
   
   done
 
