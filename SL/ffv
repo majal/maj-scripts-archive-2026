@@ -328,7 +328,7 @@ done
     ##############################################################################
     # If translation language is the same as input language, cut only
 
-    [ "${ll}" = "${lang_tr}" ] && {
+    [ "${ll}" != "${lang_tr}" ] || {
 
       # Check if array, i.e. single verse
       [ "${start_time}" -a "${end_time}" ] || {
@@ -352,7 +352,7 @@ done
     ##############################################################################
     # Translate book name, overlay using delogo and drawtext
 
-    } || {
+    } && {
     
       imagefile_tr="${textfile}_tr.png"
       convert -background none -fill black -font "${fontfile}" -pointsize ${s} label:"${overlay_book} ${c}:${v}" "${imagefile_tr}"
