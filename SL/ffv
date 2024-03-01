@@ -33,14 +33,21 @@ ff_opts_post="-y -c:a copy -c:v libx264 -c:s mov_text -crf 20 -preset slow"
 
 mpv_opts='--fullscreen=no --keep-open=always --resume-playback=no --save-position-on-quit=no'
 
+# curl -s 'https://www.jw.org/en/library/bible/study-bible/books/json' | jq '.editionData | {locale, bookCount, vernacularFullName, vernacularAbbreviation, titleFormat, books} | del( .books[] ["chapterDisplayTitle", "urlSegment", "url", "hasAudio", "hasMultimedia", "hasStudyNotes", "additionalPages", "images"])' > nwtsty_en.json
+# curl -s 'https://www.jw.org/es/library/bible/study-bible/books/json/' | jq '.editionData | {locale, bookCount, vernacularFullName, vernacularAbbreviation, titleFormat, books} | del( .books[] ["chapterDisplayTitle", "urlSegment", "url", "hasAudio", "hasMultimedia", "hasStudyNotes", "additionalPages", "images"])' > nwtsty_es.json
+# curl -s 'https://www.jw.org/vi/thu-vien/kinh-thanh/nwt/cac-sach/json' | jq '.editionData | {locale, bookCount, vernacularFullName, vernacularAbbreviation, titleFormat, books} | del( .books[] ["chapterDisplayTitle", "urlSegment", "url", "hasAudio", "hasMultimedia", "hasStudyNotes", "additionalPages", "images"])' > nwtsty_vi.json
+# curl -s 'https://www.jw.org/id/perpustakaan/alkitab/alkitab-pelajaran/buku-buku/json' | jq '.editionData | {locale, bookCount, vernacularFullName, vernacularAbbreviation, titleFormat, books} | del( .books[] ["chapterDisplayTitle", "urlSegment", "url", "hasAudio", "hasMultimedia", "hasStudyNotes", "additionalPages", "images"])' > nwtsty_id.json
+
 read -r -d '' langs <<- EOF
 {
   "ASL": "en",
   "BVL": "es",
   "SPE": "es",
-  "SLV": "vi"
+  "SLV": "vi",
+  "INI": "id"
 }
 EOF
+
 
 # FFmpeg variables
 x=93                      # Draw text translation x-axis from top left
@@ -183,7 +190,7 @@ done
 ################################################################################
 # Search in all available SLs
 
-[ "${ll}" = "ALL" ] && {
+if [[ "${ll}" = "ALL" ]]; then
 
   for ll in ${langs_available[@]}; do
 
@@ -234,7 +241,7 @@ done
 ################################################################################
 # Else, process verses
 
-} || {
+else
 
   cd "${dir_pwd}"
 
@@ -275,7 +282,7 @@ done
       sed 's#[<>:"/\|?*]#_#g')" # Sanitize file names
 
     # If verse is number, single verse only
-    [ "$vvv" -eq "$vvv" ] 2>/dev/null && {
+    if [ "$vvv" -eq "$vvv" ] 2>/dev/null; then
 
       v=${vvv}
 
@@ -294,7 +301,7 @@ done
       [ -n "${offset_end}" ] && end_time="$(echo ${end_time} + ${offset_end} | bc)"
 
     # If multiple verses, (range, contains dash)
-    } || {
+    else
 
       # Check if it contains a dash, otherwise ignore
       echo "${vvv}" | grep -q '-' || continue
@@ -323,12 +330,12 @@ done
       [ -n "${offset_start}" ] && start_time[v_start]="$(echo ${start_time[v_start]} + ${offset_start} | bc)"
       [ -n "${offset_end}" ] && end_time[v_end]="$(echo ${end_time[v_end]} + ${offset_end} | bc)"
 
-    } # END: Get start and end times
+    fi # END: Get start and end times
 
     ##############################################################################
     # If translation language is the same as input language, cut only
 
-    [ "${ll}" != "${lang_tr}" ] || {
+    if [[ "${ll}" = "${lang_tr}" ]]; then
 
       # Check if array, i.e. single verse
       [ "${start_time}" -a "${end_time}" ] || {
@@ -352,7 +359,7 @@ done
     ##############################################################################
     # Translate book name, overlay using delogo and drawtext
 
-    } && {
+    else
     
       imagefile_tr="${textfile}_tr.png"
       convert -background none -fill black -font "${fontfile}" -pointsize ${s} label:"${overlay_book} ${c}:${v}" "${imagefile_tr}"
@@ -362,7 +369,7 @@ done
       drawtext_ll="drawtext=text="${ll}":fontfile="${fontfile}":fontcolor=white:fontsize=${s}:x=$(( x )):y=$(( y + h_tr + drawtext_ll_y_offset )):alpha=${a_ll}"
 
       # If single verse
-      [ "${start_time}" -a "${end_time}" ] && {
+      if [[ "${start_time}" && "${end_time}" ]]; then
 
         echo "${overlay_book} ${c}:${v}" > "${textfile}"
 
@@ -378,7 +385,7 @@ done
         drawtext="drawtext=textfile="${textfile}":fontfile="${fontfile}":fontcolor=white:fontsize=${s}:x=${x}:y=${y}:alpha=${a},"
 
       # If multiple verses
-      } || {
+      else
 
         delogo=
         delogo_show=
@@ -406,7 +413,7 @@ done
 
         done
 
-      } # END: Translate: Get single/multiple verses
+      fi # END: Translate: Get single/multiple verses
 
       filter_play="${delogo_show}${drawtext}${drawtext_ll}"
       filter_encode="${delogo}${drawtext}${drawtext_ll}"
@@ -428,11 +435,11 @@ done
 
       }
 
-    } # END: Translation language: cut only or translate reference
+    fi # END: Translation language: cut only or translate reference
 
   done # END: For each verse group
 
-} # END: Search (lang=all) or process video from specified language
+fi # END: Search (lang=all) or process video from specified language
 
 ################################################################################
 # Cleanup

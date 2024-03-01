@@ -9,13 +9,15 @@ unique_script
 
 # dir="${HOME}/Desktop/nwt_sl"
 dir="/home/share/http-share/nwt_sl"
+dir_tmp="${dir}/.for-recode"
+processing_prefix='processing-'
 
 dl_api="https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS"
 outfmt="json"
 pub="nwt"
 format="MP4%2CM4V" # URL encoded, ie: MP4%2CM4V
 
-langs=("SLV" "BVL" "ASL" "SPE")
+langs=("SLV" "BVL" "ASL" "SPE" "INI")
 
 parallel_langs=4 # Limits parallel curl requests
 parallel_ffmpeg=6 # Limits parallel ffmpeg CPU cores
@@ -64,20 +66,23 @@ process_lang() {
     url="$(echo ${data} | cut -d , -f 2 | tr -d '"')"
     echo "${url}" | grep -Eq "^https.*(mp4|m4v)$" || continue
     file_save="${dir_lang}/"$(basename "${url}")
+    file_save_tmp="${dir_tmp}/"$(basename "${url}")
+    file_save_tmp_processing="${dir_tmp}/${processing_prefix}"$(basename "${url}")
 
     while [ $(pgrep -c ffmpeg) -ge ${parallel_ffmpeg} ]; do
-      sleep 1
+      sleep "1.$(shuf -i 00-99 -n 1)"
     done
 
-    wget -qO "${file_save}.recode" -o /dev/null "${url}" && \
-    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${file_save}.recode" -vf "${filter}" ${ff_opts_post} "${file_save}" && \
+    wget -qO "${file_save_tmp}" -o /dev/null "${url}" && \
+    nice -n 19 /usr/bin/chrt -i 0 "${ff}" ${ff_banner} -i "${file_save_tmp}" -vf "${filter}" ${ff_opts_post} "${file_save_tmp_processing}" && \
+    mv "${file_save_tmp_processing}" "${file_save}" && \
     echo "${data}" >> "${data_processed}" && \
-    rm "${file_save}.recode" &
+    rm "${file_save_tmp}" &
 
-    sleep 1 # Allow time for wget to write save file, prevent race condition on parallel_ffmpeg count
+    sleep "0.$(shuf -i 50-60 -n 1)" # Allow time for wget to write save file, prevent race condition on parallel_ffmpeg count
 
-    while [ $(ls "${dir_lang}/"*.recode 2>/dev/null | wc -l) -ge ${parallel_ffmpeg} ]; do
-      sleep 1
+    while [ $(ls "${dir_tmp}/"* 2>/dev/null | grep -cv "^${dir_tmp}/${processing_prefix}") -ge ${parallel_ffmpeg} ]; do
+      sleep "1.$(shuf -i 00-99 -n 1)"
     done
   
   done
@@ -91,6 +96,8 @@ process_lang() {
 [ -d "${dir}" ] || mkdir -p "${dir}"
 cd "${dir}"
 
+[ -d "${dir_tmp}" ] || mkdir -p "${dir_tmp}"
+rm -f "${dir_tmp}/"*
 
 for a in ${langs[@]}; do
   
