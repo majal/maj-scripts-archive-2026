@@ -30,7 +30,7 @@ ff_opts_post="-y -c:a copy -c:v libx264 -c:s mov_text -crf 20 -preset slow -nost
 ################################################################################
 # Usage and options
 
-function usage {
+usage () {
 
   echo "
 Usage: $(basename "${0}") <SL language code> <Publication code> [Additional options]

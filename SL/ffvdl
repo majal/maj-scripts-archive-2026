@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# https://www.majlovesreg.one/tag/code/
+
+[ -r "${HOME}/bin/maj-source" ] && source "${HOME}/bin/maj-source"
+
+case "$(uname)" in
+
+  Linux)
+
+    dir_dest="${HOME}/Videos/SL/Publications/nwt/nwt_sl_60fps"
+    ;;
+
+  Darwin)
+
+    dir_dest="/Volumes/linsk/SL/Vietnamese Sign Language Videos/Publications/nwt/nwt_sl_60fps"
+    ;;
+
+  *)
+
+    errx "Unknown system! Cannot set destination directory." 1
+
+esac
+
+[ -d "${dir_dest}" ] || errx "Destination directory not found: '${dir_dest}'" 2
+
+time rsync -auvh4 -e 'ssh -q' --exclude .for-recode maj@sx1a.unitedearth.space:/home/share/http-share/nwt_sl/ "${dir_dest}"
+
+echo
+
+beep

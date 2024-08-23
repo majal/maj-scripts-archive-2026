@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # https://www.majlovesreg.one/tag/code/
 
 [ -r "${HOME}/bin/maj-source" ] && source "${HOME}/bin/maj-source"
@@ -11,21 +11,44 @@
 [ -x "$(which ffmpeg)" ] || errx "Required program not found: ffmpeg" 2
 [ -x "$(which ffplay)" ] || errx "Required program not found: ffplay" 2
 [ -x "$(which ffprobe)" ] || errx "Required program not found: ffprobe" 2
-[ -x "$(which convert)" ] || errx "Required program not found: convert" 2
+[ -x "$(which magick)" ] || errx "Required program not found: magick" 2
 [ -x "$(which identify)" ] || errx "Required program not found: identify" 2
 
 ################################################################################
 # Variables
 
+debug=
+
 dir_pwd="${PWD}"
-dir_videos="${HOME}/Videos/SL/Publications/nwt/nwt_sl_60fps"
+
+case "$(uname)" in
+  
+  Linux)
+    
+    dir_videos="${HOME}/Videos/SL/Publications/nwt/nwt_sl_60fps"
+    getopt="$(which getopt)"
+    
+    ;;
+
+  Darwin)
+
+    dir_videos="/Volumes/linsk/SL/Vietnamese Sign Language Videos/Publications/nwt/nwt_sl_60fps"
+    getopt="$(brew --prefix gnu-getopt)/bin/getopt"
+    ;;
+
+  *)
+
+    dir_videos="${HOME}/Videos/SL/Publications/nwt/nwt_sl_60fps"
+    ;;
+
+esac
 
 lang_tr='SLV' # All CAPS
 lang_tr_iso='vi'
 lang_iso_default='en'
 
-fontfile="${HOME}/.fonts/Sans/Noto-Sans-Display/static/NotoSansDisplay-SemiBold.ttf"
-fontfile_estimator="${HOME}/.fonts/Sans/Noto-Sans-Display/static/NotoSansDisplay-Regular.ttf"
+fontfile="${HOME}/.fonts/Sans/Noto_Sans_Display/static/NotoSansDisplay-SemiBold.ttf"
+fontfile_estimator="${HOME}/.fonts/Sans/Noto_Sans_Display/static/NotoSansDisplay-Regular.ttf"
 
 ff='ffmpeg'
 ff_banner='-hide_banner -loglevel error -stats'
@@ -63,7 +86,7 @@ tmpfile_prefix='ff-vi60-verse'
 ################################################################################
 # Usage and options
 
-function usage {
+usage () {
 
   echo "
 Usage: $(basename "${0}") <SL language code> <Bible reference (Book Chapter:Verses)> [Additional options]
@@ -85,6 +108,7 @@ Optional options:
   -s, --offset-start   ([+]/-)seconds at the start of the video
   -e, --offset-end     ([+]/-)seconds at the end of the video
   -w, --offset-width   ([+]/-)pixels for delogo filter text width
+  -t, --offset-top     ([+]/-)pixels for delogo filter text y-axis
 
   -h, --help           Show this help text
 
@@ -108,7 +132,7 @@ Examples:
 
 }
 
-options=$(getopt -o f,m,s:,e:,w:,h -l ffmpeg,mpv,offset-start:,offset-end:,offset-width:,help -n "$(basename ${0})" -- "$@")
+options=$("${getopt}" -o f,m,s:,e:,w:,t:,h -l ffmpeg,mpv,offset-start:,offset-end:,offset-width:,offset-top:,help -n "$(basename ${0})" -- "$@")
 [ ${?} -eq 0 ] || usage
 
 eval set -- "$options"
@@ -120,6 +144,7 @@ while :; do
     -s|--offset-start) shift; offset_start="${1}"   ;;
     -e|--offset-end)   shift; offset_end="${1}"     ;;
     -w|--offset-width) shift; offset_overlay="${1}" ;;
+    -t|--offset-top)   shift; offset_top="${1}"     ;;
     -h|--help)                usage                 ;;
     --)                shift; break                 ;;
   esac
@@ -134,6 +159,8 @@ done
 cd "${dir_videos}"
 langs_available=( $(ls -1d */ | grep -o '[A-Z]\{3\}') )
 
+[ "${debug}" ] && ( set -x; echo ${langs} ${langs_available[@]} )
+
 textfile=$(mktemp --tmpdir ${tmpfile_prefix}-XXXXXXXXXX)
 
 [ -z "${offset_end}" ] && offset_end=${offset_end_default}
@@ -142,15 +169,15 @@ l="${1}"
 ll=${l^^}
 lang_iso="$(echo ${langs} | jq -r .${ll})"
 
-b="$(echo ${2} | sed 's/ [0-9]\+:[0-9, -]\+$//')"
+b=$( echo "${2}" | grep -o '^\([0-9]\)\?[^0-9]*' | tr -s ' ' | sed 's/^[ \t]*//;s/[ \t]*$//' )
 b_name="${b^}"
 
 # Get Bible book number from name
-[ "$b" -eq "$b" ] 2>/dev/null || b=$(jq -r ".books | to_entries | map(select(.value[] == \"${b_name}\")  | .key)[0]" ${dir_videos}/nwtsty_${lang_iso_default}.json)
+[ "$b" -eq "$b" ] 2>/dev/null || b=$(jq -r ".books | to_entries | map(select(.value[] == \"${b_name}\")  | .key)[0]" "${dir_videos}/nwtsty_${lang_iso_default}.json")
 [ "$b" -eq "$b" ] 2>/dev/null || {
   for lll in ${langs_available[@]}; do
     lang_iso_lll="$(echo ${langs} | jq -r .${lll})"
-    b=$(jq -r ".books | to_entries | map(select(.value[] == \"${b_name}\")  | .key)[0]" ${dir_videos}/nwtsty_${lang_iso_lll}.json)
+    b=$(jq -r ".books | to_entries | map(select(.value[] == \"${b_name}\")  | .key)[0]" "${dir_videos}/nwtsty_${lang_iso_lll}.json")
     echo-r "${b}"
     [ "$b" -eq "$b" ] 2>/dev/null && break
   done
@@ -160,16 +187,20 @@ b_name="${b^}"
 
 bb=$(printf "%02d" ${b})
 
-c="$(echo ${2} | sed -e 's/^.* \(.*\):.*$/\1/')"
+echo "${2}" | grep -q ":" && c=$( echo "${2}" | grep -o '^[^:]*' | grep -o '[0-9]*$' | tr -d ' ' ) || c=1
 cc=$(printf "%02d" ${c})
 
-overlay_book="$(jq -r '.books."'${b}'".standardSingularBookName' ${dir_videos}/nwtsty_${lang_tr_iso}.json)"
+overlay_book=$(jq -r '.books."'${b}'".standardSingularBookName' "${dir_videos}/nwtsty_${lang_tr_iso}.json")
+officialAbbreviation=$(jq -r '.books."'${b}'".officialAbbreviation' "${dir_videos}/nwtsty_${lang_iso_default}.json")
+
+[ "${debug}" ] && ( set -x; echo ${l} ${ll} ${lang_iso} ${b} ${bb} ${c} ${cc} ${overlay_book} )
 
 ################################################################################
 # Put the verses into an array
 
-# https://stackoverflow.com/a/45201229/2756066
-readarray -td '' vss < <(awk '{ gsub(/, /,"\0"); print; }' <<<"$(echo ${2} | sed 's/^.*://'), "); unset 'vss[-1]';
+vss=( $( echo "${2}" | grep -o '[0-9 ,-]*$' | sed 's/,/ /g' | tr -s ' ' ) )
+
+[ "${debug}" ] && ( set -x; declare -p vss )
 
 for (( n=0; n<${#vss[@]}; n++ )); do
 
@@ -183,9 +214,9 @@ for (( n=0; n<${#vss[@]}; n++ )); do
   
   }
 
-  # echo ${vss[${n}]}
-
 done
+
+[ "${debug}" ] && ( set -x; echo "${vss[@]}" ) && echo
 
 ################################################################################
 # Search in all available SLs
@@ -194,15 +225,18 @@ if [[ "${ll}" = "ALL" ]]; then
 
   for ll in ${langs_available[@]}; do
 
-    video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
-    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
+    # video_file=$(ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_"*"_${ll}_${cc}_r720P.mp4" 2>/dev/null)
+    # [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_"*"_${ll}_0${cc}_r720P.mp4 2>/dev/null") # Psalms
+
+    video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r720P.mp4")
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r720P.mp4") # Psalms
 
     # Old formats
-    [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.m4v 2>/dev/null)"
-    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.m4v 2>/dev/null)" # Psalms
+    [ -z "${video_file}" ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r720P.m4v")
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r720P.m4v") # Psalms
 
-    [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r480P.m4v 2>/dev/null)"
-    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r480P.m4v 2>/dev/null)" # Psalms
+    [ -z "${video_file}" ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r480P.m4v")
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r480P.m4v") # Psalms
 
     [ -z "${video_file}" ] && continue
 
@@ -212,8 +246,8 @@ if [[ "${ll}" = "ALL" ]]; then
 
         v=$vvv
 
-        start_end="$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json ${video_file} | \
-          jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')"
+        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+          jq -r '.chapters[] | select( .tags.title | test(" ('${c}':)?'${v}'(\r)?$") ) | { start_time, end_time }')
 
         [ -z "${start_end}" ] && echo-r "❌ ${ll} ${b_name} ${c}:${v}" || echo-g "✅ ${ll} ${b_name} ${c}:${v}"
 
@@ -223,8 +257,8 @@ if [[ "${ll}" = "ALL" ]]; then
 
         for v in $(seq "${vvv%-*}" "${vvv#*-}"); do
 
-          start_end="$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json ${video_file} | \
-            jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')"   
+          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+            jq -r '.chapters[] | select( .tags.title | test(" ('${c}':)?'${v}'(\r)?$") ) | { start_time, end_time }')   
 
           [ -z "${start_end}" ] && echo-r "❌ ${ll} ${b_name} ${c}:${v}" || echo-g "✅ ${ll} ${b_name} ${c}:${v}"
 
@@ -248,17 +282,17 @@ else
   [ -d "${dir_videos}/nwt_${ll}-60fps" ] || errx "Language ${ll} not found! Use scripts sl_dl_nwt_info and sl_dl_nwt?" 4
   [ -r "${dir_videos}/nwtsty_${lang_tr_iso}.json" ] || errx "Translation info not found: ${dir_videos}/nwtsty_${lang_tr_iso}.json" 7
 
-  overlay_book_estimator="$(jq -r '.books."'${b}'".standardSingularBookName' ${dir_videos}/nwtsty_${lang_iso}.json)"
+  overlay_book_estimator=$(jq -r '.books."'${b}'".standardSingularBookName' "${dir_videos}/nwtsty_${lang_iso}.json")
 
-  video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.mp4 2>/dev/null)"
-  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.mp4 2>/dev/null)" # Psalms
+  video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r720P.mp4")
+  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r720P.mp4") # Psalms
   
   # Old formats    
-  [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r720P.m4v 2>/dev/null)"
-  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r720P.m4v 2>/dev/null)" # Psalms
+  [ -z "${video_file}" ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r720P.m4v")
+  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r720P.m4v") # Psalms
 
-  [ -z "${video_file}" ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_${cc}_r480P.m4v 2>/dev/null)"
-  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file="$(ls ${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_*_${ll}_0${cc}_r480P.m4v 2>/dev/null)" # Psalms
+  [ -z "${video_file}" ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r480P.m4v")
+  [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r480P.m4v") # Psalms
 
   [ -z "${video_file}" ] && errx "${b_name} chapter ${c} not available in ${ll}" 5 || { echo-b "Source video file:  '${video_file}'"; echo; }
 
@@ -278,19 +312,19 @@ else
     start_time=
     end_time=
 
-    filename_output="${dir_pwd}/$(echo $(jq -r '.books."'${b}'".standardSingularBookName' ${dir_videos}/nwtsty_${lang_iso_default}.json) ${c}:${vvv} - ${ll} - VI60.mp4 | \
-      sed 's#[<>:"/\|?*]#_#g')" # Sanitize file names
+    filename_output=${dir_pwd}/$(echo $(jq -r '.books."'${b}'".standardSingularBookName' "${dir_videos}/nwtsty_${lang_iso_default}.json") ${c}:${vvv} - ${ll} - VI60.mp4 | \
+      sed 's#[<>:"/\|?*]#_#g') # Sanitize file names
 
     # If verse is number, single verse only
     if [ "$vvv" -eq "$vvv" ] 2>/dev/null; then
 
       v=${vvv}
 
-      start_end="$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json ${video_file} | \
-        jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')"
+      start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+        jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
       # Psalms
-      [ -z "${start_end}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && start_end="$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json ${video_file} | \
-        jq -r '.chapters[] | select( .tags.title | test(" 0'${c}':'${v}'($|\r$)") ) | { start_time, end_time }')"
+      [ -z "${start_end}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+        jq -r '.chapters[] | select( .tags.title | test(" 0'${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
 
       [ -z "${start_end}" ] && errx "Verse not available in ${ll}." 6
 
@@ -314,11 +348,11 @@ else
 
       for v in $(seq ${v_start} ${v_end}); do
 
-        start_end="$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json ${video_file} | \
-          jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')"
+        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+          jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
         # Psalms
-        [ -z "${start_end}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && start_end="$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json ${video_file} | \
-          jq -r '.chapters[] | select( .tags.title | test(" 0'${c}':'${v}'($|\r$)") ) | { start_time, end_time }')"
+        [ -z "${start_end}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+          jq -r '.chapters[] | select( .tags.title | test(" 0'${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
 
         [ -z "${start_end}" ] && continue
 
@@ -343,7 +377,11 @@ else
         end_time=${end_time[v_end]}
       } 
 
-      [ ! "${encode}" ] && ffplay ${ff_banner} -ss ${start_time} -t $(echo "${end_time} - ${start_time}" | bc) -i "${video_file}" || {
+      if [ ! "${encode}" ]; then
+
+        ffplay ${ff_banner} -ss ${start_time} -t $(echo "${end_time} - ${start_time}" | bc) -i "${video_file}"
+      
+      else
 
         ffmpeg ${ff_banner} -i "${video_file}" -ss ${start_time} -to ${end_time} ${ff_opts_post} "${filename_output}" && {
 
@@ -354,7 +392,7 @@ else
 
         }
 
-      }
+      fi
 
     ##############################################################################
     # Translate book name, overlay using delogo and drawtext
@@ -362,7 +400,7 @@ else
     else
     
       imagefile_tr="${textfile}_tr.png"
-      convert -background none -fill black -font "${fontfile}" -pointsize ${s} label:"${overlay_book} ${c}:${v}" "${imagefile_tr}"
+      magick -background none -fill black -font "${fontfile}" -pointsize ${s} label:"${overlay_book} ${c}:${v}" "${imagefile_tr}"
 
       h_tr=$(identify -format "%h" "${imagefile_tr}")
 
@@ -374,13 +412,13 @@ else
         echo "${overlay_book} ${c}:${v}" > "${textfile}"
 
         imagefile_est="${textfile}.png"
-        convert -background none -fill black -font "${fontfile_estimator}" -pointsize ${s} label:"${overlay_book_estimator} ${c}:${v}" "${imagefile_est}"
+        magick -background none -fill black -font "${fontfile_estimator}" -pointsize ${s} label:"${overlay_book_estimator} ${c}:${v}" "${imagefile_est}"
 
         w=$(identify -format "%w" "${imagefile_est}")
         h=$(identify -format "%h" "${imagefile_est}")
 
-        delogo="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=0,"
-        delogo_show="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=1,"
+        delogo="delogo=x=$(( x-5 )):y=$(( y-5 + offset_top )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=0,"
+        delogo_show="delogo=x=$(( x-5 )):y=$(( y-5 + offset_top )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=1,"
 
         drawtext="drawtext=textfile="${textfile}":fontfile="${fontfile}":fontcolor=white:fontsize=${s}:x=${x}:y=${y}:alpha=${a},"
 
@@ -397,7 +435,7 @@ else
           echo "${overlay_book} ${c}:${v}" > "${textfile}-${v}"
 
           imagefile_est="${textfile}-${v}.png"
-          convert -background none -fill black -font "${fontfile_estimator}" -pointsize ${s} label:"${overlay_book_estimator} ${c}:${v}" "${imagefile_est}"
+          magick -background none -fill black -font "${fontfile_estimator}" -pointsize ${s} label:"${overlay_book_estimator} ${c}:${v}" "${imagefile_est}"
 
           w=$(identify -format "%w" "${imagefile_est}")
           h=$(identify -format "%h" "${imagefile_est}")
@@ -406,8 +444,8 @@ else
           # On 60 fps one frame is 0.016666667 s
           [ "${v}" -eq "${v_end}" ] && filter_end=$(echo "${end_time[v]} + 0.02" | bc) || filter_end=${end_time[v]}
 
-          delogo+="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=0:enable='between(t,${start_time[v]},${filter_end})',"
-          delogo_show+="delogo=x=$(( x-5 )):y=$(( y-5 )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=1:enable='between(t,${start_time[v]},${filter_end})',"
+          delogo+="delogo=x=$(( x-5 )):y=$(( y-5 + offset_top )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=0:enable='between(t,${start_time[v]},${filter_end})',"
+          delogo_show+="delogo=x=$(( x-5 )):y=$(( y-5 + offset_top )):w=$(( w + 10 + offset_overlay )):h=$(( h+5 )):show=1:enable='between(t,${start_time[v]},${filter_end})',"
 
           drawtext+="drawtext=textfile="${textfile}-${v}":fontfile="${fontfile}":fontcolor=white:fontsize=${s}:x=${x}:y=${y}:alpha=${a}:enable='between(t,${start_time[v]},${filter_end})',"
 
@@ -422,7 +460,11 @@ else
       [ "${end_time}" ] || end_time="${end_time[v_end]}"
       [ "${start_time}" -a "${end_time}" ] || continue
 
-      [ ! "${encode}" ] && ffplay ${ff_banner} -ss ${start_time} -t $(echo "${end_time} - ${start_time}" | bc) -i "${video_file}" -vf "${filter_play}" || {
+      if [ ! "${encode}" ]; then
+
+        ffplay ${ff_banner} -ss ${start_time} -t $(echo "${end_time} - ${start_time}" | bc) -i "${video_file}" -vf "${filter_play}"
+
+      else
 
         ffmpeg ${ff_banner} -i "${video_file}" -ss ${start_time} -to ${end_time} -vf "${filter_encode}" ${ff_opts_post} "${filename_output}" && {
 
@@ -433,7 +475,7 @@ else
 
         }
 
-      }
+      fi
 
     fi # END: Translation language: cut only or translate reference
 
