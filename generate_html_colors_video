@@ -14,7 +14,7 @@ script_url='https://github.com/majal/maj-scripts/blob/master/generate_html_color
 for i in "${!hexes[@]}"; do
 
   filename="${hexes[i]}_$(echo ${names[i]} | sed 's|/|_|g' | sed 's| ||g').mp4"
-  title="HTML Colors: ${names[i]} - #${hexes[i]} rgb(${rgbs[i]})"
+  title="HTML / CSS Colors: ${names[i]} - #${hexes[i]} rgb(${rgbs[i]})"
   description="Twelve hours of ${names[i]} screen in 4K resolution. #${hexes[i]} rgb(${rgbs[i]}). Your screen color may vary depending on your display settings. This video was created using FFmpeg and this Bash script: https://bit.ly/majhtmlcolors"
 
   echo "${filename}" # | tee -a datafile
