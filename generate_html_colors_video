@@ -21,7 +21,7 @@ for i in "${!hexes[@]}"; do
   echo "${title}" # | tee -a datafile
   echo "${description}" # | tee -a datafile
 
-  ffmpeg -hide_banner -loglevel quiet -stats -filter_complex "color=0x${hexes[i]}:s=3840x2160" -r 1/60 -t 12:00:00 -metadata title="${title}" -metadata artist="Majal Mirasol" -metadata album="HTML Colors" -metadata comment="https://www.majlovesreg.one" -metadata copyright="© $(date '+%Y') Majal Mirasol" -metadata description="${description}" -y "${filename}"
+  ffmpeg -hide_banner -loglevel quiet -stats -filter_complex "color=0x${hexes[i]}:s=3840x2160" -t 12:00:00 -metadata title="${title}" -metadata artist="Majal Mirasol" -metadata album="HTML Colors" -metadata comment="https://www.majlovesreg.one" -metadata copyright="© $(date '+%Y') Majal Mirasol" -metadata description="${description}" -y "${filename}"
 
   echo # | tee -a datafile
   
