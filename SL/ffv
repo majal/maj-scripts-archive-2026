@@ -43,6 +43,9 @@ case "$(uname)" in
 
 esac
 
+# Language priority for 'any' keyword
+priority="SLV,BVL,SPE,INI,ASL"
+
 lang_tr='SLV' # All CAPS
 lang_tr_iso='vi'
 lang_iso_default='en'
@@ -96,6 +99,8 @@ Required parameters:
   SL language code     Three-letter language code used by jw.org.
                        If 'ALL' is supplied for language code, the script will
                        search on which languages the verses are available.
+                       If 'ANY' is supplied, the script will process the first
+                       available language based on priority: ${priority}.
 
   Bible reference      Single-chapter reference in quotation marks.
                        See examples below.
@@ -117,6 +122,10 @@ Examples:
   Search in which languages the verses are available:
 
     $(basename "${0}") all 'Psalms 1:1, 2, 4-6'
+
+  Process the first available language based on priority:
+
+    $(basename "${0}") any 'Psalms 1:1, 2, 4-6'
 
   Preview possible output using ffplay:
   (This is also a good example to experiment with the offset flags.)
@@ -271,6 +280,79 @@ if [[ "${ll}" = "ALL" ]]; then
     echo
 
   done
+
+################################################################################
+# Process first available SL based on priority
+
+elif [[ "${ll}" = "ANY" ]]; then
+
+  # Convert priority list to array
+  IFS=',' read -r -a priority_langs <<< "${priority}"
+
+  found=false
+  checked_langs=()
+
+  for ll in "${priority_langs[@]}"; do
+
+    # Skip if language is not available
+    [[ " ${langs_available[*]} " =~ " ${ll} " ]] || continue
+
+    checked_langs+=("${ll}")
+
+    video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r720P.mp4")
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r720P.mp4") # Psalms
+
+    # Old formats
+    [ -z "${video_file}" ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r720P.m4v")
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r720P.m4v") # Psalms
+
+    [ -z "${video_file}" ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_${cc}_r480P.m4v")
+    [ -z "${video_file}" -a "${b}" -eq 19 -a ${c} -lt 100 ] && video_file=$(2>/dev/null ls "${dir_videos}/nwt_${ll}-60fps/nwt_${bb}_${officialAbbreviation}_${ll}_0${cc}_r480P.m4v") # Psalms
+
+    [ -z "${video_file}" ] && continue
+
+    # Check if all requested verses are available
+    all_verses_available=true
+    for vvv in ${vss[@]}; do
+      if [ "$vvv" -eq "$vvv" ] 2>/dev/null; then
+        v=$vvv
+        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+          jq -r '.chapters[] | select( .tags.title | test(" ('${c}':)?'${v}'(\r)?$") ) | { start_time, end_time }')
+        [ -z "${start_end}" ] && { all_verses_available=false; break; }
+      else
+        echo "${vvv}" | grep -q '-' || continue
+        for v in $(seq "${vvv%-*}" "${vvv#*-}"); do
+          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+            jq -r '.chapters[] | select( .tags.title | test(" ('${c}':)?'${v}'(\r)?$") ) | { start_time, end_time }')
+          [ -z "${start_end}" ] && { all_verses_available=false; break; }
+        done
+        [ "$all_verses_available" = false ] && break
+      fi
+    done
+
+    # If all verses are available, execute the command
+    if [ "$all_verses_available" = true ]; then
+      found=true
+      echo-g "Found ${b_name} ${c}:${vss[*]} in ${ll}, processing..."
+      # Reconstruct the command with the found language
+      cmd=("${0}" "${ll}" "${2}")
+      [ "${encode}" = true ] && cmd+=("-f")
+      [ "${mpv}" = true ] && cmd+=("-m")
+      [ -n "${offset_start}" ] && cmd+=("-s" "${offset_start}")
+      [ -n "${offset_end}" ] && cmd+=("-e" "${offset_end}")
+      [ -n "${offset_overlay}" ] && cmd+=("-w" "${offset_overlay}")
+      [ -n "${offset_top}" ] && cmd+=("-t" "${offset_top}")
+      "${cmd[@]}"
+      break
+    fi
+  done
+
+  # If no language was found, report the checked languages
+  if [ "$found" = false ]; then
+    echo-r "No videos found for ${b_name} ${c}:${vss[*]} in any language."
+    echo "Checked languages in priority order: ${checked_langs[*]}"
+    exit 1
+  fi
 
 ################################################################################
 # Else, process verses
@@ -481,7 +563,7 @@ else
 
   done # END: For each verse group
 
-fi # END: Search (lang=all) or process video from specified language
+fi # END: Search (lang=all, any) or process video from specified language
 
 ################################################################################
 # Cleanup
