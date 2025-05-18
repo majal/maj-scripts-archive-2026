@@ -273,8 +273,13 @@ process_verses() {
     if [[ "${vvv}" =~ ^[0-9]+$ ]]; then
       v="${vvv}"
       # Get start/end time for the verse from ffprobe
-      start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
-        jq -r ".chapters[] | select(.tags.title | test(\" ${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
+      if [ "$single_chapter" ]; then
+        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+          jq -r '.chapters[] | select( .tags.title | test(" '${v}'($|\r$)") ) | { start_time, end_time }')
+      else
+        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \ 
+          jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
+      fi      
       [ -z "${start_end}" ] && [ "${b}" -eq 19 ] && [ "${c}" -lt 100 ] && \
         start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
           jq -r ".chapters[] | select(.tags.title | test(\" 0${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
@@ -292,8 +297,13 @@ process_verses() {
       v_end="${vvv#*-}"
       # Get start/end time for each verse in the range
       for v in $(seq "${v_start}" "${v_end}"); do
-        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
-          jq -r ".chapters[] | select(.tags.title | test(\" ${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
+        if [ "$single_chapter" ]; then
+          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+            jq -r '.chapters[] | select( .tags.title | test(" '${v}'($|\r$)") ) | { start_time, end_time }')
+        else
+          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \ 
+            jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
+        fi
         [ -z "${start_end}" ] && [ "${b}" -eq 19 ] && [ "${c}" -lt 100 ] && \
           start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
             jq -r ".chapters[] | select(.tags.title | test(\" 0${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
@@ -373,8 +383,13 @@ process_any_mode() {
     for vvv in "${vss[@]}"; do
       if [[ "${vvv}" =~ ^[0-9]+$ ]]; then
         v="${vvv}"
-        start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
-          jq -r ".chapters[] | select(.tags.title | test(\" ${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
+        if [ "$single_chapter" ]; then
+          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+            jq -r '.chapters[] | select( .tags.title | test(" '${v}'($|\r$)") ) | { start_time, end_time }')
+        else
+          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \ 
+            jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
+        fi
         [ -z "${start_end}" ] && [ "${b}" -eq 19 ] && [ "${c}" -lt 100 ] && \
           start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
             jq -r ".chapters[] | select(.tags.title | test(\" 0${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
@@ -382,8 +397,13 @@ process_any_mode() {
       else
         [[ "${vvv}" =~ - ]] || continue
         for v in $(seq "${vvv%-*}" "${vvv#*-}"); do
-          start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
-            jq -r ".chapters[] | select(.tags.title | test(\" ${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
+          if [ "$single_chapter" ]; then
+            start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
+              jq -r '.chapters[] | select( .tags.title | test(" '${v}'($|\r$)") ) | { start_time, end_time }')
+          else
+            start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \ 
+              jq -r '.chapters[] | select( .tags.title | test(" '${c}':'${v}'($|\r$)") ) | { start_time, end_time }')
+          fi
           [ -z "${start_end}" ] && [ "${b}" -eq 19 ] && [ "${c}" -lt 100 ] && \
             start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
               jq -r ".chapters[] | select(.tags.title | test(\" 0${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
@@ -560,7 +580,7 @@ b_name="${b^}"
 }
 [ "${b}" -eq "${b}" ] 2>/dev/null || errx "Book name not found in ${langs_available[*]}: ${b_name}" 3
 bb=$(printf "%02d" "${b}")
-echo "${2}" | grep -q ":" && c=$(echo "${2}" | grep -o '^[^:]*' | grep -o '[0-9]*$' | tr -d ' ') || c=1
+echo "${2}" | grep -q ":" && c=$(echo "${2}" | grep -o '^[^:]*' | grep -o '[0-9]*$' | tr -d ' ') || { c=1; single_chapter=true; }
 cc=$(printf "%02d" "${c}")
 officialAbbreviation=$(jq -r ".books.\"${b}\".officialAbbreviation" "${dir_videos}/nwtsty_${lang_iso_default}.json")
 
@@ -590,13 +610,13 @@ if [ "${ll}" = "ALL" ]; then
       if [[ "${vvv}" =~ ^[0-9]+$ ]]; then
         v="${vvv}"
         start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
-          jq -r ".chapters[] | select(.tags.title | test(\" ${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
+          jq -r ".chapters[] | select(.tags.title | test(\" (${c}:)?${v}($|\\r$)\") ) | { start_time, end_time }")
         [ -z "${start_end}" ] && echo-r "❌ ${ll} ${b_name} ${c}:${v}" || echo-g "✅ ${ll} ${b_name} ${c}:${v}"
       else
         [[ "${vvv}" =~ - ]] || continue
         for v in $(seq "${vvv%-*}" "${vvv#*-}"); do
           start_end=$(ffprobe -hide_banner -loglevel quiet -show_chapters -print_format json "${video_file}" | \
-            jq -r ".chapters[] | select(.tags.title | test(\" ${c}:${v}($|\\r$)\") ) | { start_time, end_time }")
+            jq -r ".chapters[] | select(.tags.title | test(\" (${c}:)?${v}($|\\r$)\") ) | { start_time, end_time }")
           [ -z "${start_end}" ] && echo-r "❌ ${ll} ${b_name} ${c}:${v}" || echo-g "✅ ${ll} ${b_name} ${c}:${v}"
         done
       fi
