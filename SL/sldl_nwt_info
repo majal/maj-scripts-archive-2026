@@ -43,4 +43,4 @@ done
 
 wait
 
-beep
+command -v workstation_beep >/dev/null 2>&1 && workstation_beep

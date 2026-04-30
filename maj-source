@@ -74,6 +74,31 @@ function unique_script () {
   [ "${instancecount}" ] && [ "${instancecount}" -gt 1 ] && errx "$(basename ${0}): Multiple instances (${instancecount}) found, exiting..." 0
 }
 
+function workstation_beep () {
+  case "${MAJ_WORKSTATION_BEEP:-auto}" in
+    0|false|False|FALSE|no|No|NO|off|Off|OFF)
+      return 0
+      ;;
+    1|true|True|TRUE|yes|Yes|YES|on|On|ON)
+      ;;
+    auto|"")
+      local host_short
+      host_short="$(hostname -s 2>/dev/null || hostname 2>/dev/null || true)"
+      case "${host_short}" in
+        sx-*|sxgw*|sxcmix*|*cmix*|*gw*|*server*)
+          return 0
+          ;;
+      esac
+      [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || return 0
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  command -v beep >/dev/null 2>&1 && beep || true
+}
+
 function maj-online () {
   ipaddr='8.8.8.8'
   $([ -z "`ping -c1 $ipaddr |& grep -o 'Network is unreachable'`" ] || exit 1; [ -z "`ping -c3 $ipaddr |& grep -o '100% packet loss'`" ] && exit 0 || exit 2)
