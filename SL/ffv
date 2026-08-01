@@ -18,7 +18,15 @@ trap cleanup EXIT
 # ------------------------------------------------------------------------------
 # Source external script for custom functions (echo-g, echo-r, errx, etc.)
 # ------------------------------------------------------------------------------
-source "/Volumes/SSK/maj-scripts/maj-source"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if [ -r "${HOME}/bin/maj-source" ]; then
+  source "${HOME}/bin/maj-source"
+elif [ -r "${script_dir}/../maj-source" ]; then
+  source "${script_dir}/../maj-source"
+else
+  echo "maj-source not found" >&2
+  exit 2
+fi
 
 ################################################################################
 # Requirements
@@ -444,7 +452,8 @@ case "$(uname)" in
     getopt="$(which getopt)"
     ;;
   Darwin)
-    dir_videos="${HOME}/Videos/SL/Publications/nwt/nwt_sl_60fps"
+    luksdrive_mount="${LUKSDRIVE_MOUNT:-/Users/maj/mnt/maj-01-black}"
+    dir_videos="${luksdrive_mount}/SL/SL Videos/Publications/nwt_sl"
     getopt="$(brew --prefix gnu-getopt)/bin/getopt"
     ;;
   *)

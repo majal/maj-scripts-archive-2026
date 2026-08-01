@@ -12,7 +12,8 @@ case "$(uname)" in
 
   Darwin)
 
-    dir_dest="/Volumes/linsk/SL/Vietnamese Sign Language Videos/Publications/nwt/nwt_sl_60fps"
+    luksdrive_mount="${LUKSDRIVE_MOUNT:-/Users/maj/mnt/maj-01-black}"
+    dir_dest="${luksdrive_mount}/SL/SL Videos/Publications/nwt/nwt_sl_60fps"
     ;;
 
   *)
